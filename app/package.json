@@ -1,0 +1,19 @@
+{
+    "name": "liuliaoyu.github.app",
+    "version": "0.0.13",
+    "description": "",
+    "main": "main.js",
+    "scripts": {
+        "build": "eos build"
+    },
+    "license": "MIT",
+    "dependencies": {
+        "@edgeros/jsre-onvif": "^1.0.1"
+    },
+    "devDependencies": {
+        "@edgeros/eslint-plugin-jsre": "latest",
+        "@edgeros/jsre-types": "latest",
+        "eslint": "^7.23.0"
+    },
+    "author": "18705197548@163.com"
+}

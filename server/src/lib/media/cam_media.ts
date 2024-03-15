@@ -132,41 +132,75 @@ export class CameraManager extends EventEmitter {
   }
 
   createStreamServer(urn: string, uri: string, app) {
-    const cam = this.cameraMap.get(urn)
-    // const videoUrl = `live/${+new Date()}.flv`
-    const videoUrl = `live/.flv`
+    const { protocol, host, pathname } = new URL(uri)
+    const { username, password } = this.cameraMap.get(urn)
+    const rtspUri = `${protocol}://${username}:${password}@${host}${pathname}`
 
-    const wsSer = WsServer.createServer('/stream/123', app)
+    console.log(rtspUri)
 
+    // const dateSocket = WsServer.createServer(`/data`, app)
+    const streamSocket = WsServer.createServer('/stream', app)
     const opts = {
       mode: 1,
-      path: '/stream/123',
-      mediaSource: {
-        source: 'flv',
-      },
-      streamChannel: {
-        protocol: 'ws',
-        server: wsSer,
-      },
+      mediaSource: { source: 'flv' },
+      streamChannel: { protocol: 'ws', server: streamSocket },
+      // dataChannel: { protocol: 'ws', server: dataSocket },
     }
+    const handnn = require('handnn')
     const server = WebMedia.createServer(opts, app)
-
+    const netcam = new MediaDecoder()
     server.on('start', () => {
-      const netcam = new MediaDecoder().open('rtsp://admin:123456@192.168.128.105:554/stream2', { proto: 'tcp' }, 10000)
+      console.log('this')
+      netcam.open(rtspUri, { proto: 'tcp' }, 10000)
 
-      netcam.destVideoFormat({ width: 640, height: 360, fps: 15, pixelFormat: MediaDecoder.PIX_FMT_RGB24, noDrop: false, disable: false })
+      // netcam.destVideoFormat({ width: 640, height: 360, fps: 15, pixelFormat: MediaDecoder.PIX_FMT_RGB24, noDrop: false, disable: false })
+      // netcam.destAudioFormat({ disable: true })
+      netcam.destVideoFormat({ width: 640, height: 360, fps: 1, pixelFormat: MediaDecoder.PIX_FMT_BGR24, noDrop: false, disable: false })
       netcam.destAudioFormat({ disable: true })
       netcam.remuxFormat({ enable: true, enableAudio: false, format: 'flv' })
+      netcam.previewFormat({ enable: true, fb: 0, fps: 25, fullscreen: false })
+
+      const ol = netcam.overlay()
+      let quited = false
+      // const colors = [MediaDecoder.C_GREEN, MediaDecoder.C_BLUE, MediaDecoder.C_YELLOW, MediaDecoder.C_WHITE, MediaDecoder.C_MAGENTA]
+
+      netcam.on('video', (video) => {
+        const buf = new Buffer(video.arrayBuffer)
+        const hands = handnn.detect(buf, { width: 640, height: 360, pixelFormat: handnn.PIX_FMT_BGR24 })
+        console.log(hands)
+        ol.clear()
+        if (hands.length) {
+          for (let i = 0; i < hands.length; i++) {
+            const info = hands[i]
+            if (info.prob > 0.5) {
+              // draw rectangle
+              ol.rect(info.x0, info.y0, info.x1, info.y1, MediaDecoder.C_RED, 2, 0, false)
+            }
+          }
+        }
+      })
+
       netcam.on('remux', (frame) => {
         const buf = Buffer.from(frame.arrayBuffer)
+        console.log(buf.length)
         server.pushStream(buf)
       })
       netcam.on('header', (frame) => {
         const buf = Buffer.from(frame.arrayBuffer)
         server.pushStream(buf)
       })
+      netcam.on('eof', () => {
+        quited = true
+      })
+
       netcam.start()
     })
+
+    console.log('here')
+    server.start()
+
+    // server.start()
+    // console.log(streamSocket)
 
     // const dataServer = WsServer.createServer(`/${videoUrl}.media`, app)
     // const streamServer = WsServer.createServer(`/stream`, app)

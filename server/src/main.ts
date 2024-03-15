@@ -37,43 +37,9 @@ camMan.on('ready', (urn) => {
   camMan.loginCamera(urn, 'admin', '123456')
 })
 camMan.on('login', (urn) => {
-  const wsc = WsServer.createServer('/stream', app)
-  const opts = {
-    mode: 1,
-    mediaSource: {
-      source: 'flv',
-    },
-    streamChannel: {
-      protocol: 'ws',
-      server: wsc,
-    },
-  }
-  const server = WebMedia.createServer(opts, app)
-  const netcam = new MediaDecoder()
-  server.on('start', () => {
-    console.log('this')
-    netcam.open('rtsp://admin:123456@192.168.128.105:554/stream2', { proto: 'tcp' }, 10000)
-    netcam.destVideoFormat({ width: 640, height: 360, fps: 15, pixelFormat: MediaDecoder.PIX_FMT_RGB24, noDrop: false, disable: false })
-    netcam.destAudioFormat({ disable: true })
-    netcam.remuxFormat({ enable: true, enableAudio: false, format: 'flv' })
-    netcam.on('remux', (frame) => {
-      const buf = Buffer.from(frame.arrayBuffer)
-      console.log(buf.length)
-      server.pushStream(buf)
-    })
-    netcam.on('header', (frame) => {
-      const buf = Buffer.from(frame.arrayBuffer)
-      server.pushStream(buf)
-    })
-    netcam.start()
-  })
-
-  console.log('here')
-  server.start()
-  // server.start()
-  console.log(wsc)
-
-  // func(app)
+  const ps = camMan.getCamProfiles(urn)
+  console.log(ps)
+  camMan.createStreamServer(urn, ps[0].uri, app)
 })
 
 // * middlewares

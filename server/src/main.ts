@@ -1,9 +1,14 @@
+import { HttpServer } from 'http'
 import WebApp from 'webapp'
 import iosched from 'iosched'
 
 import { bodyParser } from 'middleware'
+import MediaDecoder from 'mediadecoder'
+import WebMedia from 'webmedia'
+import { WsServer } from 'websocket'
 
 import permission from 'async/permission'
+import socket from 'socket'
 import deviceRoute from './routes/device'
 import debugRoute from './routes/debug'
 
@@ -16,31 +21,65 @@ import { checkPermission, getIfnames } from './lib/utils'
 
 import { CameraManager } from './lib/media/cam_media'
 
+// var WsServer = require('websocket').WsServer
+// wsc.start()
 const app = WebApp.createApp()
+
+console.inspectEnable = true
+
+const sddr = socket.sockaddr(socket.INADDR_LOOPBACK, 8000)
+
+const camMan = new CameraManager()
+
+// const res = await
+getIfnames().then(res => camMan.createOnvifDiscovery(Object.values(res)))
+camMan.on('ready', (urn) => {
+  camMan.loginCamera(urn, 'admin', '123456')
+})
+camMan.on('login', (urn) => {
+  const wsc = WsServer.createServer('/stream', app)
+  const opts = {
+    mode: 1,
+    mediaSource: {
+      source: 'flv',
+    },
+    streamChannel: {
+      protocol: 'ws',
+      server: wsc,
+    },
+  }
+  const server = WebMedia.createServer(opts, app)
+  const netcam = new MediaDecoder()
+  server.on('start', () => {
+    console.log('this')
+    netcam.open('rtsp://admin:123456@192.168.128.105:554/stream2', { proto: 'tcp' }, 10000)
+    netcam.destVideoFormat({ width: 640, height: 360, fps: 15, pixelFormat: MediaDecoder.PIX_FMT_RGB24, noDrop: false, disable: false })
+    netcam.destAudioFormat({ disable: true })
+    netcam.remuxFormat({ enable: true, enableAudio: false, format: 'flv' })
+    netcam.on('remux', (frame) => {
+      const buf = Buffer.from(frame.arrayBuffer)
+      console.log(buf.length)
+      server.pushStream(buf)
+    })
+    netcam.on('header', (frame) => {
+      const buf = Buffer.from(frame.arrayBuffer)
+      server.pushStream(buf)
+    })
+    netcam.start()
+  })
+
+  console.log('here')
+  server.start()
+  // server.start()
+  console.log(wsc)
+
+  // func(app)
+})
 
 // * middlewares
 app.use(WebApp.static('./public'))
 app.use(bodyParser.json())
 app.use(bodyParser.urlencoded())
-
-// ; (async () => {
-//   const res = await checkPermission(['network'])
-//   console.log(res)
-//   if (!res)
-//     permission.update({ network: true })
-// })()
-
-// if (!res)
-// await permission.update({ network: true })
-
-/*
-const cam = new CameraManager()
-
-getIfnames().then((res) => {
-  // console.log(res)
-  cam.createOnvifDiscovery(Object.values(res))
-})
-*/
 
 // console.inspectEnable = true
 

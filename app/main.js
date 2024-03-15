@@ -3,28 +3,271 @@
 var WebApp = require('webapp');
 var iosched = require('iosched');
 var middleware = require('middleware');
+var MediaDecoder = require('mediadecoder');
+var WebMedia = require('webmedia');
+var websocket = require('websocket');
+var socket = require('socket');
+var advnwc = require('async/advnwc');
+require('async/permission');
+var EventEmitter = require('events');
+var jsreOnvif = require('@edgeros/jsre-onvif');
 
+// 网络接口名称
+async function getIfnames() {
+    return {
+        lan: (await advnwc.netifs(true))[0],
+        wan: (await advnwc.netifs(false))[0],
+    };
+}
+
+// import { WsServer } from 'websocket'
+const WsServer = require('websocket').WsServer;
+// import { checkPerm, getIfnames } from '../utils'
+console.inspectEnable = true;
+class CameraManager extends EventEmitter {
+    constructor() {
+        super();
+        this.cameraMap = new Map();
+        this.streamMap = new Map();
+        this.profileMap = new Map();
+    }
+    createOnvifDiscovery(ifnames) {
+        const nets = ifnames.map(item => ({ ifname: item, localPort: 0 }));
+        this.onvifDiscovery = new jsreOnvif.Discovery(nets, { resolve: false }); // 不自动创建 Cam 对象
+        this.onvifDiscovery.on('find', this.onFind.bind(this));
+        this.onvifDiscovery.on('lost', this.onLost.bind(this));
+        this.onvifDiscovery.on('start', () => {
+            console.info('[CameraManager] onvif discovery start');
+            this.onvifDiscovery.discovery(); // 仅允许调用一次，会间隔一段时间调用 search()
+            Task.nextTick(() => { this.onvifDiscovery.search(); }); // 创建后立即调用一下 search()
+        });
+        this.onvifDiscovery.start();
+    }
+    onFind(camInfo) {
+        console.info('[CameraManager] find new camera:', camInfo.hostname);
+        /* {
+          hostname: '192.168.128.105',
+          port: 2020,
+          path: '/onvif/device_service',
+          urn: 'uuid:3fa1fe68-b915-4053-a3e1-f46d2fb9ca76',
+          _valid: true,
+          _invalids: 0
+        } */
+        if (this.cameraMap.has(camInfo.urn))
+            return;
+        this.cameraMap.set(camInfo.urn, camInfo);
+        this.emit('ready', camInfo.urn);
+    }
+    onLost(camera) {
+        console.info('[CameraManager] find new camera:', camera);
+        this.cameraMap.delete(camera.urn);
+        this.cameraMap.get(camera.urn);
+        // this.emitDevMap()
+        // this.emitDevLost(dev)
+        // const server = this._serverMap.get(dev.urn)
+        // if (server) {
+        // server.ser.stop()
+        // }
+    }
+    // 传入username和password获得cam和profile
+    loginCamera(urn, username, password) {
+        const camInfo = this.cameraMap.get(urn);
+        camInfo.username = username;
+        camInfo.password = password;
+        const cam = new jsreOnvif.Cam(camInfo);
+        cam.on('connect', async (err, data) => {
+            if (err) {
+                console.error(`[camera:${cam.hostname}] connect failed`, err);
+            }
+            else {
+                console.info(`[camera:${cam.hostname}] connect success`);
+                const profiles = await Promise.all(cam.profiles.map(async (profile) => ({
+                    token: profile.$.token,
+                    name: profile.name,
+                    video: {
+                        resolution: profile.videoEncoderConfiguration.resolution,
+                    },
+                    uri: await new Promise((resolve, reject) => {
+                        cam.getStreamUri({ protocol: 'RTSP', profileToken: profile.$.token }, (err, stream) => {
+                            if (err)
+                                reject(err);
+                            resolve(stream.uri);
+                        });
+                    }),
+                })));
+                this.profileMap.set(cam.urn, profiles);
+                console.info(`[camera:${cam.hostname}] profiles:`, JSON.stringify(profiles));
+                this.emit('login', cam.urn);
+            }
+        });
+    }
+    getCamList() {
+        return Array.from(this.cameraMap.values()).map(({ hostname, port, path, urn }) => ({ hostname, port, path, urn }));
+    }
+    isCamLogin(urn) {
+        return this.cameraMap.get(urn) instanceof jsreOnvif.Cam;
+    }
+    getCamProfiles(urn) {
+        return this.profileMap.get(urn);
+    }
+    createStreamServer(urn, uri, app) {
+        this.cameraMap.get(urn);
+        const wsSer = WsServer.createServer('/stream/123', app);
+        const opts = {
+            mode: 1,
+            path: '/stream/123',
+            mediaSource: {
+                source: 'flv',
+            },
+            streamChannel: {
+                protocol: 'ws',
+                server: wsSer,
+            },
+        };
+        const server = WebMedia.createServer(opts, app);
+        server.on('start', () => {
+            const netcam = new MediaDecoder().open('rtsp://admin:123456@192.168.128.105:554/stream2', { proto: 'tcp' }, 10000);
+            netcam.destVideoFormat({ width: 640, height: 360, fps: 15, pixelFormat: MediaDecoder.PIX_FMT_RGB24, noDrop: false, disable: false });
+            netcam.destAudioFormat({ disable: true });
+            netcam.remuxFormat({ enable: true, enableAudio: false, format: 'flv' });
+            netcam.on('remux', (frame) => {
+                const buf = Buffer.from(frame.arrayBuffer);
+                server.pushStream(buf);
+            });
+            netcam.on('header', (frame) => {
+                const buf = Buffer.from(frame.arrayBuffer);
+                server.pushStream(buf);
+            });
+            netcam.start();
+        });
+        // const dataServer = WsServer.createServer(`/${videoUrl}.media`, app)
+        // const streamServer = WsServer.createServer(`/stream`, app)
+        // const mediaOpts = {
+        //   mode: 1,
+        //   path: '/stream',
+        //   mediaSource: { source: 'flv' },
+        //   streamChannel: { protocol: 'ws', server: streamServer },
+        //   // dataChannel: { protocol: 'ws', server: dataServer },
+        // }
+        // console.info(`[camera:${cam.hostname}][uri:${uri}]`)
+        // const urlObj = new URL(uri)
+        // const { username, password } = cam
+        // const rtspUrl = `${urlObj.protocol}://${username}:${password}@${urlObj.host}${urlObj.pathname}`
+        // console.log(rtspUrl)
+        // try {
+        //   const mediaServer = WebMedia.createServer(mediaOpts, app)
+        //   mediaServer.on('start', (server) => {
+        //     const netcam = new MediaDecoder().open(rtspUrl, { proto: 'tcp' }, 10000)
+        //     const videoFormat = netcam.srcVideoFormat()
+        //     const audioFormat = netcam.srcAudioFormat()
+        //     console.log('[video format]:', JSON.stringify(videoFormat))
+        //     console.log('[audio format]:', JSON.stringify(audioFormat))
+        //     // netcam.destVideoFormat({ width: videoFormat.width / 2, height: videoFormat.height / 2, fps: 4, pixelFormat: MediaDecoder.PIX_FMT_RGB24, disable: false })
+        //     // netcam.destAudioFormat({ disable: true })
+        //     // netcam.remuxFormat({ enable: true, enableAudio: false, format: 'flv' })
+        //     netcam.destVideoFormat({ width: 640, height: 360, fps: 15, pixelFormat: MediaDecoder.PIX_FMT_RGB24, noDrop: false, disable: false })
+        //     netcam.destAudioFormat({ disable: true })
+        //     netcam.remuxFormat({ enable: true, enableAudio: false, format: 'flv' })
+        //     // netcam.destVideoFormat({ width: info.width, height: info.height, fps: 1, disable: false });
+        //     // netcam.on('video', (frame) => {
+        //     // console.log(frame);
+        //     // console.log(Buffer.from(frame.arrayBuffer))
+        //     // })
+        //     netcam.on('remux', (frame) => {
+        //       const buf = Buffer.from(frame.arrayBuffer)
+        //       // console.log(Buffer.from(frame.arrayBuffer).length)
+        //       server.pushStream(buf)
+        //     })
+        //     netcam.on('header', (frame) => {
+        //       const buf = Buffer.from(frame.arrayBuffer)
+        //       // console.log(frame);
+        //       server.pushStream(buf)
+        //     })
+        //     netcam.start()
+        //     this.streamMap.set(uri, mediaServer)
+        //   })
+        //   mediaServer.on('stop', () => {
+        //     console.warn('[webmedia on stop]')
+        //     // netcam && netcam.stop()
+        //     // setTimeout(() => {
+        //     //   netcam && netcam.close()
+        //     // }, 0)
+        //     this.streamMap.delete(uri)
+        //   })
+        //   mediaServer.on('open', () => {
+        //     /* 客户端与服务端连接成功触发 */
+        //     console.info('[webmedia on open]')
+        //   })
+        //   mediaServer.on('close', () => {
+        //     /* 客户端与服务端连接关闭触发 */
+        //     console.warn('[webmedia on close]')
+        //   })
+        //   mediaServer.on('end', () => {
+        //     console.warn('[webmedia on end]')
+        //   })
+        //   mediaServer.start()
+        //   console.info('create webMedia server success!')
+        //   return { result: true, message: '首次打开服务，请耐心等待...', data: videoUrl }
+        // }
+        // catch (error) {
+        //   console.error('create webMedia server failed!', error)
+        //   return { result: false, message: '打开摄像头失败，请检查配置正常后重试！', data: error }
+        // }
+    }
+}
+
+// var WsServer = require('websocket').WsServer
+// wsc.start()
 const app = WebApp.createApp();
+console.inspectEnable = true;
+socket.sockaddr(socket.INADDR_LOOPBACK, 8000);
+const camMan = new CameraManager();
+// const res = await
+getIfnames().then(res => camMan.createOnvifDiscovery(Object.values(res)));
+camMan.on('ready', (urn) => {
+    camMan.loginCamera(urn, 'admin', '123456');
+});
+camMan.on('login', (urn) => {
+    const wsc = websocket.WsServer.createServer('/stream', app);
+    const opts = {
+        mode: 1,
+        mediaSource: {
+            source: 'flv',
+        },
+        streamChannel: {
+            protocol: 'ws',
+            server: wsc,
+        },
+    };
+    const server = WebMedia.createServer(opts, app);
+    const netcam = new MediaDecoder();
+    server.on('start', () => {
+        console.log('this');
+        netcam.open('rtsp://admin:123456@192.168.128.105:554/stream2', { proto: 'tcp' }, 10000);
+        netcam.destVideoFormat({ width: 640, height: 360, fps: 15, pixelFormat: MediaDecoder.PIX_FMT_RGB24, noDrop: false, disable: false });
+        netcam.destAudioFormat({ disable: true });
+        netcam.remuxFormat({ enable: true, enableAudio: false, format: 'flv' });
+        netcam.on('remux', (frame) => {
+            const buf = Buffer.from(frame.arrayBuffer);
+            console.log(buf.length);
+            server.pushStream(buf);
+        });
+        netcam.on('header', (frame) => {
+            const buf = Buffer.from(frame.arrayBuffer);
+            server.pushStream(buf);
+        });
+        netcam.start();
+    });
+    console.log('here');
+    server.start();
+    // server.start()
+    console.log(wsc);
+    // func(app)
+});
 // * middlewares
 app.use(WebApp.static('./public'));
 app.use(middleware.bodyParser.json());
 app.use(middleware.bodyParser.urlencoded());
-// ; (async () => {
-//   const res = await checkPermission(['network'])
-//   console.log(res)
-//   if (!res)
-//     permission.update({ network: true })
-// })()
-// if (!res)
-// await permission.update({ network: true })
-/*
-const cam = new CameraManager()
-
-getIfnames().then((res) => {
-  // console.log(res)
-  cam.createOnvifDiscovery(Object.values(res))
-})
-*/
 // console.inspectEnable = true
 // import SocketIO from 'socket.io'
 // const server = new SocketIO(app, {

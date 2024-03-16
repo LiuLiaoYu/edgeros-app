@@ -3,7 +3,6 @@
 var WebApp = require('webapp');
 var iosched = require('iosched');
 var middleware = require('middleware');
-var socket = require('socket');
 var advnwc = require('async/advnwc');
 require('async/permission');
 var URL = require('url');
@@ -11,6 +10,17 @@ var EventEmitter = require('events');
 var jsreOnvif = require('@edgeros/jsre-onvif');
 var MediaDecoder = require('mediadecoder');
 var WebMedia = require('webmedia');
+var SocketServer = require('socket.io');
+
+// for esm import
+const Router = require('web_router');
+
+const debugRoute = new Router();
+debugRoute.get("/server/info", (req, res) => {
+    res.json({
+        port: req.app.port(),
+    });
+});
 
 // 网络接口名称
 async function getIfnames() {
@@ -110,7 +120,7 @@ class CameraManager extends EventEmitter {
     getCamProfiles(urn) {
         return this.profileMap.get(urn);
     }
-    createStreamServer(urn, uri, app) {
+    async createStreamServer(urn, uri, app) {
         const { protocol, host, pathname } = new URL(uri);
         const { username, password } = this.cameraMap.get(urn);
         const rtspUri = `${protocol}://${username}:${password}@${host}${pathname}`;
@@ -123,7 +133,7 @@ class CameraManager extends EventEmitter {
             streamChannel: { protocol: 'ws', server: streamSocket },
             // dataChannel: { protocol: 'ws', server: dataSocket },
         };
-        const handnn = require('handnn');
+        // const handnn = require('handnn')
         const server = WebMedia.createServer(opts, app);
         const netcam = new MediaDecoder();
         server.on('start', () => {
@@ -135,38 +145,42 @@ class CameraManager extends EventEmitter {
             netcam.destAudioFormat({ disable: true });
             netcam.remuxFormat({ enable: true, enableAudio: false, format: 'flv' });
             netcam.previewFormat({ enable: true, fb: 0, fps: 25, fullscreen: false });
-            const ol = netcam.overlay();
+            // const ol = netcam.overlay()
+            // let quited = false
             // const colors = [MediaDecoder.C_GREEN, MediaDecoder.C_BLUE, MediaDecoder.C_YELLOW, MediaDecoder.C_WHITE, MediaDecoder.C_MAGENTA]
-            netcam.on('video', (video) => {
-                const buf = new Buffer(video.arrayBuffer);
-                const hands = handnn.detect(buf, { width: 640, height: 360, pixelFormat: handnn.PIX_FMT_BGR24 });
-                console.log(hands);
-                ol.clear();
-                if (hands.length) {
-                    for (let i = 0; i < hands.length; i++) {
-                        const info = hands[i];
-                        if (info.prob > 0.5) {
-                            // draw rectangle
-                            ol.rect(info.x0, info.y0, info.x1, info.y1, MediaDecoder.C_RED, 2, 0, false);
-                        }
-                    }
-                }
-            });
+            // netcam.on('video', (video) => {
+            //   const buf = new Buffer(video.arrayBuffer)
+            //   const hands = handnn.detect(buf, { width: 640, height: 360, pixelFormat: handnn.PIX_FMT_BGR24 })
+            //   console.log(hands)
+            //   ol.clear()
+            //   if (hands.length) {
+            //     for (let i = 0; i < hands.length; i++) {
+            //       const info = hands[i]
+            //       if (info.prob > 0.5) {
+            //         // draw rectangle
+            //         ol.rect(info.x0, info.y0, info.x1, info.y1, MediaDecoder.C_RED, 2, 0, false)
+            //       }
+            //     }
+            //   }
+            // })
             netcam.on('remux', (frame) => {
                 const buf = Buffer.from(frame.arrayBuffer);
-                console.log(buf.length);
+                // console.log(buf.length)
                 server.pushStream(buf);
             });
             netcam.on('header', (frame) => {
                 const buf = Buffer.from(frame.arrayBuffer);
                 server.pushStream(buf);
             });
-            netcam.on('eof', () => {
-            });
             netcam.start();
         });
         console.log('here');
         server.start();
+        return {
+            protocol: 'wss',
+            path: '/stream',
+            // stream: "wss://"
+        };
         // server.start()
         // console.log(streamSocket)
         // const dataServer = WsServer.createServer(`/${videoUrl}.media`, app)
@@ -245,119 +259,57 @@ class CameraManager extends EventEmitter {
     }
 }
 
-// var WsServer = require('websocket').WsServer
-// wsc.start()
+// socketio 2.2; jsre builtin
+class DeviceStatePush {
+    constructor(app, options) {
+        this.socketServer = SocketServer(app, options);
+    }
+    send(event, data) {
+        this.socketServer.sockets.emit(event, data);
+    }
+    report(report) {
+        this.socketServer.sockets.emit('device:report', report);
+    }
+}
+
 const app = WebApp.createApp();
+// * routes
+// app.use('/api/device', deviceRoute)
+app.use('/api/debug', debugRoute);
 console.inspectEnable = true;
-socket.sockaddr(socket.INADDR_LOOPBACK, 8000);
-const camMan = new CameraManager();
-// const res = await
-getIfnames().then(res => camMan.createOnvifDiscovery(Object.values(res)));
-camMan.on('ready', (urn) => {
-    camMan.loginCamera(urn, 'admin', '123456');
-});
-camMan.on('login', (urn) => {
-    const ps = camMan.getCamProfiles(urn);
-    console.log(ps);
-    camMan.createStreamServer(urn, ps[0].uri, app);
-});
 // * middlewares
 app.use(WebApp.static('./public'));
 app.use(middleware.bodyParser.json());
 app.use(middleware.bodyParser.urlencoded());
-// console.inspectEnable = true
-// import SocketIO from 'socket.io'
-// const server = new SocketIO(app, {
-//   path: "/socket/"
-// })
-/*
-import { DeviceStatePush } from "./routes/push";
 const pusher = new DeviceStatePush(app, {
-  path: "/socket/device-push",
-  allowUpgrades: true,
-})
+    path: '/socket/device-push',
+    allowUpgrades: true,
+});
 pusher.socketServer.sockets.on('connection', () => {
-  pusher.report({ a: 123 })
-})
-
-import { DeviceManager } from './lib/device/device-manager'
-import { toDevice } from "./lib/device/device-enhance";
-const deviceManager = new DeviceManager()
-deviceManager.init()
-deviceManager.push(pusher)
-
-import { fetchPermission } from "./lib/permission.wrap";
-
-fetchPermission().then(res => {
-  console.log(res)
-}).catch(err => {
-  console.log(err)
-})
-*/
-// import MediaDecoder from "mediadecoder";
-// /*
-// rtsp://admin:123456@192.168.128.105:554/stream1
-// const MediaDecoder = require('mediadecoder');
-// var mediadecoder = new MediaDecoder();
-// mediadecoder.open('rtsp://admin:123456@192.168.128.105:554/stream2', {
-//   name: 'camera', proto: 'tcp'
-//   }, 5000, function(error) {
-//   if (error) {
-//     console.error('Open file', error);
-//   } else {
-//     console.info('Opened!');
-//   }
-// });
-// */
-// MediaDecoder.open = function (url, opts, timeout, callback) {
-// try {
-// var mediadecoder = new MediaDecoder().open(url, opts, timeout, callback);
-// } catch (error) {
-// var mediadecoder = undefined;
-// }
-// return mediadecoder;
-// }
-//
-//
-// let netcam = MediaDecoder.open('rtsp://admin:123456@192.168.128.105:554/stream2', { proto: 'tcp' }, 10000, (err) => {
-// if (err)  console.log(err)
-// })
-// var netcam = (new MediaDecoder()).open('rtsp://admin:123456@192.168.128.105:554/stream1', { proto: 'tcp' }, 10000);
-/*
-var netcam = (new MediaDecoder()).open('rtsp://admin:123456@192.168.128.105:554/stream1', { proto: 'tcp' }, 10000, (err) => {
-  console.log(err)
+    pusher.report({ msg: 'connect' });
 });
-
-console.log(netcam)
-
-if (netcam == undefined) {
-  console.error('Can not connect camera!');
-}
-
-netcam.destVideoFormat({ width: 640, height: 360, fps: 1, pixelFormat: MediaDecoder.PIX_FMT_RGB24, noDrop: false, disable: false });
-netcam.destAudioFormat({ disable: true });
-netcam.previewFormat({ enable: true, fb: 0, fps: 25 });
-
-console.log(netcam.info())
-
-var quited = false;
-
-netcam.on('video', (video) => {
-  // do something
+// pusher.send('camera:stream', { msg: 'haha' })
+const camMan = new CameraManager();
+getIfnames().then(res => camMan.createOnvifDiscovery(Object.values(res)));
+camMan.on('ready', (urn) => {
+    camMan.loginCamera(urn, 'admin', '123456');
 });
-
-netcam.on('eof', () => {
-  quited = true;
+camMan.on('login', async (urn) => {
+    const ps = camMan.getCamProfiles(urn);
+    console.log(ps);
+    const res = await camMan.createStreamServer(urn, ps[0].uri, app);
+    pusher.send('camera:stream', res);
+    pusher.report(res);
+    console.log(res);
 });
-
-netcam.start();
-
-// while (!quited) {
-//   iosched.poll(); // Event poll.
-// }
-
-// netcam.close();
-*/
+pusher.socketServer.sockets.on('stream:get', (cb) => {
+    cb({ msg: 'ok' });
+});
+// import { DeviceManager } from './lib/device/device-manager'
+// import { toDevice } from "./lib/device/device-enhance";
+// const deviceManager = new DeviceManager()
+// deviceManager.init()
+// deviceManager.push(pusher)
 // * start app
 app.start();
 // * event loop

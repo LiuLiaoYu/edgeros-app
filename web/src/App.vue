@@ -2,10 +2,8 @@
 import { useLightStore } from './composables/store/light'
 
 let devid = ''
-const s = true
 
 let data
-
 async function fun() {
   data = await getDeviceList()
   console.log(data)
@@ -18,27 +16,42 @@ function sleep(delay: number) {
 }
 const light = useLightStore()
 
-/*
-  ; (async () => {
-  await fun()
-  light.online(devid)
-  light.num = 150
-})()
-*/
-
 // 预设动作：减少状态汇报，
 // 动态减少状态汇报？
 // 设置无响应状态
 
-const active = ref('cameras')
+const active = ref('actions')
 const showDebugPage = true
+
+function func() {
+  socket.emit('stream:get', (res) => {
+    console.log(res)
+  })
+}
+
+// page switch animation
+const router = useRouter()
+const tabNames = ['/action', '/camera', '/recognition', '/test/debug']
+router.afterEach((to, from) => {
+  if (from.name === undefined) {
+    to.meta.transition = 'scale'
+  }
+  else {
+    const toIdx = tabNames.indexOf(to.name as string)
+    const fromIdx = tabNames.indexOf(from.name as string)
+    to.meta.transition = toIdx < fromIdx ? 'slide-right' : 'slide-left'
+  }
+})
 </script>
 
 <template>
   <edger-safe-area>
     <van-config-provider theme="light">
-      <router-view h-full />
-
+      <router-view v-slot="{ Component, route }">
+        <transition :name="route.meta.transition">
+          <component :is="Component" />
+        </transition>
+      </router-view>
       <van-tabbar v-model="active" route safe-area-inset-bottom>
         <van-tabbar-item name="actions" replace to="/action">
           <span>动作</span>
@@ -71,4 +84,66 @@ const showDebugPage = true
   </edger-safe-area>
 </template>
 
-<style scoped></style>
+<style scoped>
+.slide-left-enter-active,
+.slide-left-leave-active,
+.slide-right-enter-active,
+.slide-right-leave-active {
+  transition: all 0.5s ease-in-out;
+}
+
+.slide-left-enter-to {
+  position: absolute;
+  right: 0;
+}
+
+.slide-left-enter-from {
+  position: absolute;
+  right: -100%;
+}
+
+.slide-left-leave-to {
+  position: absolute;
+  left: -100%;
+  opacity: 0;
+}
+
+.slide-left-leave-from {
+  position: absolute;
+  left: 0;
+  opacity: 100%;
+}
+
+.slide-right-enter-to {
+  position: absolute;
+  left: 0;
+}
+
+.slide-right-enter-from {
+  position: absolute;
+  left: -100%;
+}
+
+.slide-right-leave-to {
+  position: absolute;
+  right: -100%;
+  opacity: 0;
+}
+
+.slide-right-leave-from {
+  position: absolute;
+  right: 0;
+  opacity: 100%;
+}
+
+.scale-enter-active,
+.scale-leave-active {
+  transition: all 0.5s ease;
+}
+
+.scale-enter-from,
+.scale-leave-to {
+  opacity: 0;
+  transform: scale(0.9);
+}
+</style>

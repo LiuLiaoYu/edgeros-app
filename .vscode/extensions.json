@@ -1,0 +1,8 @@
+{
+  "recommendations": [
+    "Vue.volar",
+    "EdgerOS.edgeros",
+    "dbaeumer.vscode-eslint",
+    "antfu.unocss"
+  ]
+}

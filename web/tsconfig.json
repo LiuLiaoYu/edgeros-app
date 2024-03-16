@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "target": "ES2015",
+    "target": "ES2017",
     "jsx": "preserve",
     "lib": [
       "DOM",
@@ -17,7 +17,7 @@
     "resolveJsonModule": true,
     "types": [
       "vite/client",
-      "vite-plugin-pages/client",
+      "unplugin-vue-router/client",
       "unplugin-vue-macros/macros-global"
     ],
     "allowJs": true,
@@ -34,7 +34,8 @@
     "src/**/*.tsx",
     "src/**/*.vue",
     "./auto-imports.d.ts",
-    "./components.d.ts"
+    "./components.d.ts",
+    "./typed-router.d.ts"
   ],
   "exclude": [
     "dist",

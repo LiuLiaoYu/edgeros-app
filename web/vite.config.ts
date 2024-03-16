@@ -6,7 +6,9 @@ import Vue from '@vitejs/plugin-vue'
 import Components from 'unplugin-vue-components/vite'
 import AutoImport from 'unplugin-auto-import/vite'
 import UnoCSS from 'unocss/vite'
-import Pages from 'vite-plugin-pages'
+
+// import Pages from 'vite-plugin-pages'
+import VueRouter from 'unplugin-vue-router/vite'
 
 import { VantResolver } from 'unplugin-vue-components/resolvers'
 
@@ -23,6 +25,13 @@ export default defineConfig({
     },
   },
   plugins: [
+    VueRouter({
+      dts: true,
+      routesFolder: 'src/pages/',
+      extensions: ['.vue'],
+      // importMode: 'sync',
+      // routesFolder: './src/pages/',
+    }),
     VueMacros({
       defineOptions: false,
       defineModels: false,
@@ -35,7 +44,6 @@ export default defineConfig({
         }),
       },
     }),
-    Pages(),
     AutoImport({
       imports: [
         'vue',
@@ -60,7 +68,7 @@ export default defineConfig({
     UnoCSS(),
   ],
   build: {
-    outDir: '../../app/public/',
+    outDir: '../app/public/',
   },
   test: {
     environment: 'jsdom',

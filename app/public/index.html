@@ -1,31 +1,24 @@
+<!DOCTYPE html>
 <html>
 
 <head>
-  <!-- <link rel="icon" href="data:image/ico;base64,aWNv"> -->
+  <meta charset="UTF-8">
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, viewport-fit=cover" />
+  <title>EdgerOS IoT App</title>
+  <script type="module" crossorigin src="./assets/index-HE25nTKb.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DTTL3YGn.css">
 </head>
 
-<body>
-  <script src="/mpegts.js"></script>
-  <div style="border: 1px blue solid;">
-    <video id="videoElement" width="300" controls></video>
-  </div>
-  <button onclick="func()"> here</button>
-  <script>
-    function func() {
-      if (mpegts.getFeatureList().mseLivePlayback) {
-        var videoElement = document.getElementById('videoElement')
-        var player = mpegts.createPlayer({
-          type: 'flv',  // could also be mpegts, m2ts, flv
-          isLive: true,
-          // url: `wss://${document.domain}:8000/stream`
-          url: `wss://${document.domain}:${window.location.port}/stream`
-        })
-        player.attachMediaElement(videoElement)
-        player.load()
-        player.play()
-      }
-    }
-  </script>
+<!-- <body dark:text-white dark:bg-hex-121212 font-mono> -->
+
+<body >
+  <!-- <div id="app" bg-gradient-repeating-linear from-blue to-blue-100 h-100vh></div> -->
+  <div id="app" h-100vh bg-gray-100></div>
+  <noscript>
+    <div>Please enable JavaScript to use this application.</div>
+  </noscript>
 </body>
 
 </html>

@@ -14,19 +14,22 @@ async function orientationUnlock() {
 </script>
 
 <template>
-  <div>orientation: {{ edgerOrientation }}</div>
-  <div>safeAreaInsets: {{ edgerSafeAreaInsets }}</div>
-  <div>env: {{ edgerEnvInfo }}</div>
-  <div>theme: {{ edgerTheme }}</div>
+  <div>
+    <div>orientation: {{ edgerOrientation }}</div>
+    <div>safeAreaInsets: {{ edgerSafeAreaInsets }}</div>
+    <div>env: {{ edgerEnvInfo }}</div>
+    <div>theme: {{ edgerTheme }}</div>
+    <div>token: {{ authTokenHeader }}</div>
 
-  <van-grid square>
-    <van-grid-item text="其他页面" to="/other-page" />
-    <van-grid-item text="WebRTC请求" to="/test/webrtc" />
-    <van-grid-item text="横屏锁定" @click="orientationLock('landscape')" />
-    <van-grid-item text="竖屏锁定" @click="orientationLock('portrait')" />
-    <van-grid-item text="解除屏幕锁定" @click="orientationUnlock()" />
-    <van-grid-item text="显示Toast" @click="showToast('hello')" />
-  </van-grid>
+    <van-grid square>
+      <van-grid-item text="其他页面" to="/other-page" />
+      <van-grid-item text="WebRTC请求" to="/test/webrtc" />
+      <van-grid-item text="横屏锁定" @click="orientationLock('landscape')" />
+      <van-grid-item text="竖屏锁定" @click="orientationLock('portrait')" />
+      <van-grid-item text="解除屏幕锁定" @click="orientationUnlock()" />
+      <van-grid-item text="显示Toast" @click="showToast('hello')" />
+    </van-grid>
+  </div>
 </template>
 
 <style scope></style>

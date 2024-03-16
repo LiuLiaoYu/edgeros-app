@@ -131,11 +131,10 @@ export class CameraManager extends EventEmitter {
     return this.profileMap.get(urn)
   }
 
-  createStreamServer(urn: string, uri: string, app) {
+  async createStreamServer(urn: string, uri: string, app) {
     const { protocol, host, pathname } = new URL(uri)
     const { username, password } = this.cameraMap.get(urn)
     const rtspUri = `${protocol}://${username}:${password}@${host}${pathname}`
-
     console.log(rtspUri)
 
     // const dateSocket = WsServer.createServer(`/data`, app)
@@ -146,7 +145,7 @@ export class CameraManager extends EventEmitter {
       streamChannel: { protocol: 'ws', server: streamSocket },
       // dataChannel: { protocol: 'ws', server: dataSocket },
     }
-    const handnn = require('handnn')
+    // const handnn = require('handnn')
     const server = WebMedia.createServer(opts, app)
     const netcam = new MediaDecoder()
     server.on('start', () => {
@@ -160,37 +159,34 @@ export class CameraManager extends EventEmitter {
       netcam.remuxFormat({ enable: true, enableAudio: false, format: 'flv' })
       netcam.previewFormat({ enable: true, fb: 0, fps: 25, fullscreen: false })
 
-      const ol = netcam.overlay()
-      let quited = false
+      // const ol = netcam.overlay()
+      // let quited = false
       // const colors = [MediaDecoder.C_GREEN, MediaDecoder.C_BLUE, MediaDecoder.C_YELLOW, MediaDecoder.C_WHITE, MediaDecoder.C_MAGENTA]
 
-      netcam.on('video', (video) => {
-        const buf = new Buffer(video.arrayBuffer)
-        const hands = handnn.detect(buf, { width: 640, height: 360, pixelFormat: handnn.PIX_FMT_BGR24 })
-        console.log(hands)
-        ol.clear()
-        if (hands.length) {
-          for (let i = 0; i < hands.length; i++) {
-            const info = hands[i]
-            if (info.prob > 0.5) {
-              // draw rectangle
-              ol.rect(info.x0, info.y0, info.x1, info.y1, MediaDecoder.C_RED, 2, 0, false)
-            }
-          }
-        }
-      })
+      // netcam.on('video', (video) => {
+      //   const buf = new Buffer(video.arrayBuffer)
+      //   const hands = handnn.detect(buf, { width: 640, height: 360, pixelFormat: handnn.PIX_FMT_BGR24 })
+      //   console.log(hands)
+      //   ol.clear()
+      //   if (hands.length) {
+      //     for (let i = 0; i < hands.length; i++) {
+      //       const info = hands[i]
+      //       if (info.prob > 0.5) {
+      //         // draw rectangle
+      //         ol.rect(info.x0, info.y0, info.x1, info.y1, MediaDecoder.C_RED, 2, 0, false)
+      //       }
+      //     }
+      //   }
+      // })
 
       netcam.on('remux', (frame) => {
         const buf = Buffer.from(frame.arrayBuffer)
-        console.log(buf.length)
+        // console.log(buf.length)
         server.pushStream(buf)
       })
       netcam.on('header', (frame) => {
         const buf = Buffer.from(frame.arrayBuffer)
         server.pushStream(buf)
-      })
-      netcam.on('eof', () => {
-        quited = true
       })
 
       netcam.start()
@@ -198,6 +194,12 @@ export class CameraManager extends EventEmitter {
 
     console.log('here')
     server.start()
+
+    return {
+      protocol: 'wss',
+      path: '/stream',
+      // stream: "wss://"
+    }
 
     // server.start()
     // console.log(streamSocket)

@@ -7,8 +7,11 @@ export {}
 
 declare module 'vue' {
   export interface GlobalComponents {
+    CameraMonitor: typeof import('./src/components/CameraMonitor.vue')['default']
     CameraStream: typeof import('./src/components/CameraStream.vue')['default']
     EdgerSafeArea: typeof import('./src/components/EdgerSafeArea.vue')['default']
+    RouterLink: typeof import('vue-router')['RouterLink']
+    RouterView: typeof import('vue-router')['RouterView']
     TabbarWrap: typeof import('./src/components/TabbarWrap.vue')['default']
     VanCell: typeof import('vant/es')['Cell']
     VanCellGroup: typeof import('vant/es')['CellGroup']
@@ -17,7 +20,6 @@ declare module 'vue' {
     VanEmpty: typeof import('vant/es')['Empty']
     VanGrid: typeof import('vant/es')['Grid']
     VanGridItem: typeof import('vant/es')['GridItem']
-    VanNumberKeyboard: typeof import('vant/es')['NumberKeyboard']
     VanTabbar: typeof import('vant/es')['Tabbar']
     VanTabbarItem: typeof import('vant/es')['TabbarItem']
   }

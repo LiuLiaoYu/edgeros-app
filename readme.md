@@ -12,6 +12,13 @@
 
 文件夹：
 app：eap打包的目录
+
 server：后端代码，使用typescript，rollup打包，生成到app/main.js
+
 web：前端代码，使用vue，vite构建，生成到app/public/下
 
+
+
+
+
+[flv.js的追帧、断流重连及实时更新的直播优化方案 - 夏大师 - 博客园 (cnblogs.com)](https://www.cnblogs.com/xiahj/p/flvExtend.html)

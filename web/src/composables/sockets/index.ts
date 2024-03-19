@@ -1,5 +1,5 @@
 import io from 'socket.io-client'
-import { authTokenHeader } from '..'
+import { authTokenHeader } from '../utils/edger-auth-token'
 
 export const socketClient = io({
   path: '/socket/device-push',
@@ -9,6 +9,10 @@ export const socketClient = io({
 
 socketClient.on('connect', () => {
   console.info('socket connected')
+})
+
+socketClient.on('hello-test', (res) => {
+  console.log(res)
 })
 
 socketClient.on('device:report', (report) => {

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { showToast } from 'vant'
+
 const viewer = ref()
 
 // const ws = new WebSocket(`wss://${document.location.hostname}:3000`)
@@ -57,7 +59,6 @@ for (const type of types) {
     <div max-w-50rem w-full flex>
       <video
         ref="viewer"
-
         muted controls autoplay w-full
       />
     </div>

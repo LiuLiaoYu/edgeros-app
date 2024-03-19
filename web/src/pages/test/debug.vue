@@ -11,6 +11,10 @@ async function orientationUnlock() {
   const ret = await edger.orientation.unlock()
   return ret.success
 }
+
+function func() {
+  showToast('你好')
+}
 </script>
 
 <template>
@@ -27,7 +31,7 @@ async function orientationUnlock() {
       <van-grid-item text="横屏锁定" @click="orientationLock('landscape')" />
       <van-grid-item text="竖屏锁定" @click="orientationLock('portrait')" />
       <van-grid-item text="解除屏幕锁定" @click="orientationUnlock()" />
-      <van-grid-item text="显示Toast" @click="showToast('hello')" />
+      <van-grid-item text="显示Toast" @click="func('hello')" />
     </van-grid>
   </div>
 </template>

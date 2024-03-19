@@ -1,10 +1,10 @@
 import '@unocss/reset/normalize.css'
 import 'virtual:uno.css'
+import 'vant/lib/index.css'
 
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import { createRouter, createWebHashHistory } from 'vue-router/auto'
-import { Toast } from 'vant'
 
 import App from './App.vue'
 
@@ -23,7 +23,6 @@ const app = createApp(App)
 
 app.use(pinia)
 app.use(router)
-app.use(Toast)
 
 // init EdgerOS token before app mount
 initToken().then(() => {

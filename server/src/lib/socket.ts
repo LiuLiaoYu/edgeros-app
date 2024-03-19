@@ -1,7 +1,7 @@
 // socketio 2.2; jsre builtin
 import SocketServer from 'socket.io'
 
-export class DeviceStatePush {
+export class StatePusher {
   socketServer: any
   constructor(app, options) {
     this.socketServer = SocketServer(app, options)
@@ -13,5 +13,9 @@ export class DeviceStatePush {
 
   report(report) {
     this.socketServer.sockets.emit('device:report', report)
+  }
+
+  listenAll(event, callbackFn) {
+    this.socketServer.sockets.on(event, callbackFn)
   }
 }

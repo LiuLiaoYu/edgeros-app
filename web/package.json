@@ -26,6 +26,7 @@
     "@antfu/eslint-config": "^2.8.0",
     "@eslint/eslintrc": "^3.0.2",
     "@iconify/json": "^2.2.190",
+    "@types/eslint__eslintrc": "^2.1.1",
     "@types/node": "^20.11.24",
     "@types/socket.io-client": "^3.0.0",
     "@unocss/eslint-config": "^0.58.5",

@@ -1,15 +1,17 @@
 import URL from 'url'
 import EventEmitter from 'events'
-import util from 'util'
 import { Cam, Discovery } from '@edgeros/jsre-onvif'
 
 // import type { WebMediaServerOption } from 'webmedia'
 import MediaDecoder from 'mediadecoder'
 import WebMedia from 'webmedia'
-import { log } from 'edgeros:console'
 
-// import { WsServer } from 'websocket'
-const WsServer = require('websocket').WsServer
+import { WsServer } from 'websocket'
+
+// import facenn from 'facenn'
+import handnn from 'handnn'
+
+// const WsServer = require('websocket').WsServer
 
 // import { checkPerm, getIfnames } from '../utils'
 
@@ -19,10 +21,10 @@ console.inspectEnable = true
 // Cam: connect rawResponse rawRequest
 
 export interface CameraInfo {
+  urn: string
   hostname: string
   port: number
   path: string
-  urn: string
   _valid: boolean
   _invalids: number
   username?: string
@@ -88,9 +90,11 @@ export class CameraManager extends EventEmitter {
     camInfo.username = username
     camInfo.password = password
     const cam = new Cam(camInfo)
+
     cam.on('connect', async (err, data) => {
       if (err) {
         console.error(`[camera:${cam.hostname}] connect failed`, err)
+        this.emit('login-error', cam.urn)
       }
       else {
         console.info(`[camera:${cam.hostname}] connect success`)
@@ -137,13 +141,13 @@ export class CameraManager extends EventEmitter {
     const rtspUri = `${protocol}://${username}:${password}@${host}${pathname}`
     console.log(rtspUri)
 
-    // const dateSocket = WsServer.createServer(`/data`, app)
+    const dataSocket = WsServer.createServer(`/data`, app)
     const streamSocket = WsServer.createServer('/stream', app)
     const opts = {
       mode: 1,
       mediaSource: { source: 'flv' },
       streamChannel: { protocol: 'ws', server: streamSocket },
-      // dataChannel: { protocol: 'ws', server: dataSocket },
+      dataChannel: { protocol: 'ws', server: dataSocket },
     }
     // const handnn = require('handnn')
     const server = WebMedia.createServer(opts, app)
@@ -154,30 +158,41 @@ export class CameraManager extends EventEmitter {
 
       // netcam.destVideoFormat({ width: 640, height: 360, fps: 15, pixelFormat: MediaDecoder.PIX_FMT_RGB24, noDrop: false, disable: false })
       // netcam.destAudioFormat({ disable: true })
-      netcam.destVideoFormat({ width: 640, height: 360, fps: 1, pixelFormat: MediaDecoder.PIX_FMT_BGR24, noDrop: false, disable: false })
-      netcam.destAudioFormat({ disable: true })
-      netcam.remuxFormat({ enable: true, enableAudio: false, format: 'flv' })
-      netcam.previewFormat({ enable: true, fb: 0, fps: 25, fullscreen: false })
+      netcam.destVideoFormat({
+        width: 640,
+        height: 360,
+        fps: 1,
+        pixelFormat: MediaDecoder.PIX_FMT_BGR24,
+        disable: false,
+      })
+      netcam.destAudioFormat({
+        disable: true,
+      })
+      netcam.remuxFormat({
+        enable: true,
+        enableAudio: false,
+        format: 'flv',
+      })
 
-      // const ol = netcam.overlay()
-      // let quited = false
-      // const colors = [MediaDecoder.C_GREEN, MediaDecoder.C_BLUE, MediaDecoder.C_YELLOW, MediaDecoder.C_WHITE, MediaDecoder.C_MAGENTA]
+      const ol = netcam.overlay()
+      ol.line(0, 0, 80, 80, MediaDecoder.C_RED, 4)
+      netcam.on('video', (video) => {
+        const buf = new Buffer(video.arrayBuffer)
+        const hands = handnn.detect(buf, { width: 640, height: 360, pixelFormat: handnn.PIX_FMT_BGR24 })
 
-      // netcam.on('video', (video) => {
-      //   const buf = new Buffer(video.arrayBuffer)
-      //   const hands = handnn.detect(buf, { width: 640, height: 360, pixelFormat: handnn.PIX_FMT_BGR24 })
-      //   console.log(hands)
-      //   ol.clear()
-      //   if (hands.length) {
-      //     for (let i = 0; i < hands.length; i++) {
-      //       const info = hands[i]
-      //       if (info.prob > 0.5) {
-      //         // draw rectangle
-      //         ol.rect(info.x0, info.y0, info.x1, info.y1, MediaDecoder.C_RED, 2, 0, false)
-      //       }
-      //     }
-      //   }
-      // })
+        // console.log(hands)
+        // ol.clear()
+        // if (hands.length) {
+        //   for (let i = 0; i < hands.length; i++) {
+        //     const info = hands[i]
+        //     if (info.prob > 0.5) {
+        //       // draw rectangle
+        //       ol.rect(info.x0, info.y0, info.x1, info.y1, MediaDecoder.C_RED, 2, 0, false)
+        //     }
+        //   }
+        // }
+        server.sendData(hands)
+      })
 
       netcam.on('remux', (frame) => {
         const buf = Buffer.from(frame.arrayBuffer)
@@ -188,6 +203,8 @@ export class CameraManager extends EventEmitter {
         const buf = Buffer.from(frame.arrayBuffer)
         server.pushStream(buf)
       })
+
+      console.log(netcam.info())
 
       netcam.start()
     })

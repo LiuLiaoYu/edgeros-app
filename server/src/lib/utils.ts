@@ -22,6 +22,10 @@ export async function checkPermission(permsList: string[]) {
   return await permission.check(perms)
 }
 
+export async function checkDevicePermission(devids: string[]) {
+  return await permission.check({ devices: devids })
+}
+
 // 网络接口名称
 export async function getIfnames() {
   return {

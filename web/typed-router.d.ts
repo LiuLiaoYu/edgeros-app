@@ -23,7 +23,6 @@ declare module 'vue-router/auto-routes' {
     '/camera': RouteRecordInfo<'/camera', '/camera', Record<never, never>, Record<never, never>>,
     '/recognition': RouteRecordInfo<'/recognition', '/recognition', Record<never, never>, Record<never, never>>,
     '/test/debug': RouteRecordInfo<'/test/debug', '/test/debug', Record<never, never>, Record<never, never>>,
-    '/test/EdgerOrientation': RouteRecordInfo<'/test/EdgerOrientation', '/test/EdgerOrientation', Record<never, never>, Record<never, never>>,
     '/test/webrtc': RouteRecordInfo<'/test/webrtc', '/test/webrtc', Record<never, never>, Record<never, never>>,
   }
 }

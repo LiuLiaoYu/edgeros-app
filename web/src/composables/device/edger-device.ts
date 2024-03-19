@@ -1,6 +1,4 @@
 import { edger } from '@edgeros/web-sdk'
-import { createFetch } from '@vueuse/core'
-import { authTokenHeader } from '..'
 
 export class DevicePack {
   value: any = {}
@@ -30,34 +28,15 @@ export function toDevice(devid: string) {
   return new DevicePack(devid)
 }
 
-export const useFetchDevice = createFetch({
-  baseUrl: '/api/device/',
-  combination: 'overwrite',
-  options: {
-    async beforeFetch({ options, cancel }) {
-      const { token, srand } = await getEdgerToken()
-      if (!(token && srand))
-        cancel()
-      options.headers = {
-        ...options.headers,
-        ...authTokenHeader.value,
-        // 'edger-token': token,
-        // 'edger-srand': srand,
-      }
-      return { options }
-    },
-  },
-})
+// export async function getDeviceList() {
+//   const { data } = await useFetchDevice('/list').get().json()
+//   return data
+// }
 
-export async function getDeviceList() {
-  const { data } = await useFetchDevice('/list').get().json()
-  return data
-}
-
-export async function requestDevicePermission(deviceIds: string[]) {
-  const { success } = await edger.permission.request({ code: deviceIds, type: 'devices' })
-  return success
-}
+// export async function requestDevicePermission(deviceIds: string[]) {
+//   const { success } = await edger.permission.request({ code: deviceIds, type: 'devices' })
+//   return success
+// }
 
 // export interface DevicePack {
 //   method: "get" | "set" | "report" | "pair",

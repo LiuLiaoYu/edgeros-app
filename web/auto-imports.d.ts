@@ -36,10 +36,10 @@ declare global {
   const eagerComputed: typeof import('@vueuse/core')['eagerComputed']
   const edgerAuthToken: typeof import('./src/composables/edger-auth-token')['edgerAuthToken']
   const edgerAuthTokenHeader: typeof import('./src/composables/edger-auth-token')['edgerAuthTokenHeader']
-  const edgerEnvInfo: typeof import('./src/composables/edger/web')['edgerEnvInfo']
-  const edgerOrientation: typeof import('./src/composables/edger/web')['edgerOrientation']
-  const edgerSafeAreaInsets: typeof import('./src/composables/edger/web')['edgerSafeAreaInsets']
-  const edgerTheme: typeof import('./src/composables/edger/web')['edgerTheme']
+  const edgerEnvInfo: typeof import('./src/composables/utils/edger-web-sdk')['edgerEnvInfo']
+  const edgerOrientation: typeof import('./src/composables/utils/edger-web-sdk')['edgerOrientation']
+  const edgerSafeAreaInsets: typeof import('./src/composables/utils/edger-web-sdk')['edgerSafeAreaInsets']
+  const edgerTheme: typeof import('./src/composables/utils/edger-web-sdk')['edgerTheme']
   const effectScope: typeof import('vue')['effectScope']
   const extendRef: typeof import('@vueuse/core')['extendRef']
   const getCurrentInstance: typeof import('vue')['getCurrentInstance']
@@ -52,7 +52,7 @@ declare global {
   const initToken: typeof import('./src/composables/utils/edger-auth-token')['initToken']
   const inject: typeof import('vue')['inject']
   const injectLocal: typeof import('@vueuse/core')['injectLocal']
-  const isDark: typeof import('./src/composables/dark')['isDark']
+  const isDark: typeof import('./src/composables/utils/dark')['isDark']
   const isDefined: typeof import('@vueuse/core')['isDefined']
   const isProxy: typeof import('vue')['isProxy']
   const isReactive: typeof import('vue')['isReactive']
@@ -116,7 +116,7 @@ declare global {
   const toRef: typeof import('vue')['toRef']
   const toRefs: typeof import('vue')['toRefs']
   const toValue: typeof import('vue')['toValue']
-  const toggleDark: typeof import('./src/composables/dark')['toggleDark']
+  const toggleDark: typeof import('./src/composables/utils/dark')['toggleDark']
   const triggerRef: typeof import('vue')['triggerRef']
   const tryOnBeforeMount: typeof import('@vueuse/core')['tryOnBeforeMount']
   const tryOnBeforeUnmount: typeof import('@vueuse/core')['tryOnBeforeUnmount']
@@ -143,6 +143,7 @@ declare global {
   const useAsyncQueue: typeof import('@vueuse/core')['useAsyncQueue']
   const useAsyncState: typeof import('@vueuse/core')['useAsyncState']
   const useAttrs: typeof import('vue')['useAttrs']
+  const useAuthFetch: typeof import('./src/composables/utils/use-auth-fetch')['useAuthFetch']
   const useBase64: typeof import('@vueuse/core')['useBase64']
   const useBattery: typeof import('@vueuse/core')['useBattery']
   const useBluetooth: typeof import('@vueuse/core')['useBluetooth']
@@ -174,11 +175,11 @@ declare global {
   const useDocumentVisibility: typeof import('@vueuse/core')['useDocumentVisibility']
   const useDraggable: typeof import('@vueuse/core')['useDraggable']
   const useDropZone: typeof import('@vueuse/core')['useDropZone']
-  const useEdgerOsAuthToken: typeof import('./src/composables/edger-auth-token')['useEdgerOsAuthToken']
-  const useEdgerOsEnv: typeof import('./src/composables/edger/web')['useEdgerOsEnv']
-  const useEdgerOsOrientation: typeof import('./src/composables/edger/web')['useEdgerOsOrientation']
-  const useEdgerOsSafeArea: typeof import('./src/composables/edger/web')['useEdgerOsSafeArea']
-  const useEdgerOsTheme: typeof import('./src/composables/edger/web')['useEdgerOsTheme']
+  const useEdgerOsAuthToken: typeof import('./src/composables/utils/edger-auth-token')['useEdgerOsAuthToken']
+  const useEdgerOsEnv: typeof import('./src/composables/utils/edger-web-sdk')['useEdgerOsEnv']
+  const useEdgerOsOrientation: typeof import('./src/composables/utils/edger-web-sdk')['useEdgerOsOrientation']
+  const useEdgerOsSafeArea: typeof import('./src/composables/utils/edger-web-sdk')['useEdgerOsSafeArea']
+  const useEdgerOsTheme: typeof import('./src/composables/utils/edger-web-sdk')['useEdgerOsTheme']
   const useElementBounding: typeof import('@vueuse/core')['useElementBounding']
   const useElementByPoint: typeof import('@vueuse/core')['useElementByPoint']
   const useElementHover: typeof import('@vueuse/core')['useElementHover']
@@ -350,21 +351,20 @@ declare module 'vue' {
     readonly defineAsyncComponent: UnwrapRef<typeof import('vue')['defineAsyncComponent']>
     readonly defineComponent: UnwrapRef<typeof import('vue')['defineComponent']>
     readonly eagerComputed: UnwrapRef<typeof import('@vueuse/core')['eagerComputed']>
-    readonly edgerEnvInfo: UnwrapRef<typeof import('./src/composables/edger/web')['edgerEnvInfo']>
-    readonly edgerOrientation: UnwrapRef<typeof import('./src/composables/edger/web')['edgerOrientation']>
-    readonly edgerSafeAreaInsets: UnwrapRef<typeof import('./src/composables/edger/web')['edgerSafeAreaInsets']>
-    readonly edgerTheme: UnwrapRef<typeof import('./src/composables/edger/web')['edgerTheme']>
+    readonly edgerEnvInfo: UnwrapRef<typeof import('./src/composables/utils/edger-web-sdk')['edgerEnvInfo']>
+    readonly edgerOrientation: UnwrapRef<typeof import('./src/composables/utils/edger-web-sdk')['edgerOrientation']>
+    readonly edgerSafeAreaInsets: UnwrapRef<typeof import('./src/composables/utils/edger-web-sdk')['edgerSafeAreaInsets']>
+    readonly edgerTheme: UnwrapRef<typeof import('./src/composables/utils/edger-web-sdk')['edgerTheme']>
     readonly effectScope: UnwrapRef<typeof import('vue')['effectScope']>
     readonly extendRef: UnwrapRef<typeof import('@vueuse/core')['extendRef']>
     readonly getCurrentInstance: UnwrapRef<typeof import('vue')['getCurrentInstance']>
     readonly getCurrentScope: UnwrapRef<typeof import('vue')['getCurrentScope']>
-    readonly getDeviceList: UnwrapRef<typeof import('./src/composables/device/edger-device')['getDeviceList']>
     readonly h: UnwrapRef<typeof import('vue')['h']>
     readonly ignorableWatch: UnwrapRef<typeof import('@vueuse/core')['ignorableWatch']>
     readonly initToken: UnwrapRef<typeof import('./src/composables/utils/edger-auth-token')['initToken']>
     readonly inject: UnwrapRef<typeof import('vue')['inject']>
     readonly injectLocal: UnwrapRef<typeof import('@vueuse/core')['injectLocal']>
-    readonly isDark: UnwrapRef<typeof import('./src/composables/dark')['isDark']>
+    readonly isDark: UnwrapRef<typeof import('./src/composables/utils/dark')['isDark']>
     readonly isDefined: UnwrapRef<typeof import('@vueuse/core')['isDefined']>
     readonly isProxy: UnwrapRef<typeof import('vue')['isProxy']>
     readonly isReactive: UnwrapRef<typeof import('vue')['isReactive']>
@@ -408,7 +408,6 @@ declare module 'vue' {
     readonly refDefault: UnwrapRef<typeof import('@vueuse/core')['refDefault']>
     readonly refThrottled: UnwrapRef<typeof import('@vueuse/core')['refThrottled']>
     readonly refWithControl: UnwrapRef<typeof import('@vueuse/core')['refWithControl']>
-    readonly requestDevicePermission: UnwrapRef<typeof import('./src/composables/device/edger-device')['requestDevicePermission']>
     readonly resolveComponent: UnwrapRef<typeof import('vue')['resolveComponent']>
     readonly resolveRef: UnwrapRef<typeof import('@vueuse/core')['resolveRef']>
     readonly resolveUnref: UnwrapRef<typeof import('@vueuse/core')['resolveUnref']>
@@ -427,7 +426,7 @@ declare module 'vue' {
     readonly toRef: UnwrapRef<typeof import('vue')['toRef']>
     readonly toRefs: UnwrapRef<typeof import('vue')['toRefs']>
     readonly toValue: UnwrapRef<typeof import('vue')['toValue']>
-    readonly toggleDark: UnwrapRef<typeof import('./src/composables/dark')['toggleDark']>
+    readonly toggleDark: UnwrapRef<typeof import('./src/composables/utils/dark')['toggleDark']>
     readonly triggerRef: UnwrapRef<typeof import('vue')['triggerRef']>
     readonly tryOnBeforeMount: UnwrapRef<typeof import('@vueuse/core')['tryOnBeforeMount']>
     readonly tryOnBeforeUnmount: UnwrapRef<typeof import('@vueuse/core')['tryOnBeforeUnmount']>
@@ -454,6 +453,7 @@ declare module 'vue' {
     readonly useAsyncQueue: UnwrapRef<typeof import('@vueuse/core')['useAsyncQueue']>
     readonly useAsyncState: UnwrapRef<typeof import('@vueuse/core')['useAsyncState']>
     readonly useAttrs: UnwrapRef<typeof import('vue')['useAttrs']>
+    readonly useAuthFetch: UnwrapRef<typeof import('./src/composables/utils/use-auth-fetch')['useAuthFetch']>
     readonly useBase64: UnwrapRef<typeof import('@vueuse/core')['useBase64']>
     readonly useBattery: UnwrapRef<typeof import('@vueuse/core')['useBattery']>
     readonly useBluetooth: UnwrapRef<typeof import('@vueuse/core')['useBluetooth']>
@@ -485,10 +485,10 @@ declare module 'vue' {
     readonly useDocumentVisibility: UnwrapRef<typeof import('@vueuse/core')['useDocumentVisibility']>
     readonly useDraggable: UnwrapRef<typeof import('@vueuse/core')['useDraggable']>
     readonly useDropZone: UnwrapRef<typeof import('@vueuse/core')['useDropZone']>
-    readonly useEdgerOsEnv: UnwrapRef<typeof import('./src/composables/edger/web')['useEdgerOsEnv']>
-    readonly useEdgerOsOrientation: UnwrapRef<typeof import('./src/composables/edger/web')['useEdgerOsOrientation']>
-    readonly useEdgerOsSafeArea: UnwrapRef<typeof import('./src/composables/edger/web')['useEdgerOsSafeArea']>
-    readonly useEdgerOsTheme: UnwrapRef<typeof import('./src/composables/edger/web')['useEdgerOsTheme']>
+    readonly useEdgerOsEnv: UnwrapRef<typeof import('./src/composables/utils/edger-web-sdk')['useEdgerOsEnv']>
+    readonly useEdgerOsOrientation: UnwrapRef<typeof import('./src/composables/utils/edger-web-sdk')['useEdgerOsOrientation']>
+    readonly useEdgerOsSafeArea: UnwrapRef<typeof import('./src/composables/utils/edger-web-sdk')['useEdgerOsSafeArea']>
+    readonly useEdgerOsTheme: UnwrapRef<typeof import('./src/composables/utils/edger-web-sdk')['useEdgerOsTheme']>
     readonly useElementBounding: UnwrapRef<typeof import('@vueuse/core')['useElementBounding']>
     readonly useElementByPoint: UnwrapRef<typeof import('@vueuse/core')['useElementByPoint']>
     readonly useElementHover: UnwrapRef<typeof import('@vueuse/core')['useElementHover']>
@@ -500,7 +500,6 @@ declare module 'vue' {
     readonly useEyeDropper: UnwrapRef<typeof import('@vueuse/core')['useEyeDropper']>
     readonly useFavicon: UnwrapRef<typeof import('@vueuse/core')['useFavicon']>
     readonly useFetch: UnwrapRef<typeof import('@vueuse/core')['useFetch']>
-    readonly useFetchDevice: UnwrapRef<typeof import('./src/composables/device/edger-device')['useFetchDevice']>
     readonly useFileDialog: UnwrapRef<typeof import('@vueuse/core')['useFileDialog']>
     readonly useFileSystemAccess: UnwrapRef<typeof import('@vueuse/core')['useFileSystemAccess']>
     readonly useFocus: UnwrapRef<typeof import('@vueuse/core')['useFocus']>
@@ -653,21 +652,20 @@ declare module '@vue/runtime-core' {
     readonly defineAsyncComponent: UnwrapRef<typeof import('vue')['defineAsyncComponent']>
     readonly defineComponent: UnwrapRef<typeof import('vue')['defineComponent']>
     readonly eagerComputed: UnwrapRef<typeof import('@vueuse/core')['eagerComputed']>
-    readonly edgerEnvInfo: UnwrapRef<typeof import('./src/composables/edger/web')['edgerEnvInfo']>
-    readonly edgerOrientation: UnwrapRef<typeof import('./src/composables/edger/web')['edgerOrientation']>
-    readonly edgerSafeAreaInsets: UnwrapRef<typeof import('./src/composables/edger/web')['edgerSafeAreaInsets']>
-    readonly edgerTheme: UnwrapRef<typeof import('./src/composables/edger/web')['edgerTheme']>
+    readonly edgerEnvInfo: UnwrapRef<typeof import('./src/composables/utils/edger-web-sdk')['edgerEnvInfo']>
+    readonly edgerOrientation: UnwrapRef<typeof import('./src/composables/utils/edger-web-sdk')['edgerOrientation']>
+    readonly edgerSafeAreaInsets: UnwrapRef<typeof import('./src/composables/utils/edger-web-sdk')['edgerSafeAreaInsets']>
+    readonly edgerTheme: UnwrapRef<typeof import('./src/composables/utils/edger-web-sdk')['edgerTheme']>
     readonly effectScope: UnwrapRef<typeof import('vue')['effectScope']>
     readonly extendRef: UnwrapRef<typeof import('@vueuse/core')['extendRef']>
     readonly getCurrentInstance: UnwrapRef<typeof import('vue')['getCurrentInstance']>
     readonly getCurrentScope: UnwrapRef<typeof import('vue')['getCurrentScope']>
-    readonly getDeviceList: UnwrapRef<typeof import('./src/composables/device/edger-device')['getDeviceList']>
     readonly h: UnwrapRef<typeof import('vue')['h']>
     readonly ignorableWatch: UnwrapRef<typeof import('@vueuse/core')['ignorableWatch']>
     readonly initToken: UnwrapRef<typeof import('./src/composables/utils/edger-auth-token')['initToken']>
     readonly inject: UnwrapRef<typeof import('vue')['inject']>
     readonly injectLocal: UnwrapRef<typeof import('@vueuse/core')['injectLocal']>
-    readonly isDark: UnwrapRef<typeof import('./src/composables/dark')['isDark']>
+    readonly isDark: UnwrapRef<typeof import('./src/composables/utils/dark')['isDark']>
     readonly isDefined: UnwrapRef<typeof import('@vueuse/core')['isDefined']>
     readonly isProxy: UnwrapRef<typeof import('vue')['isProxy']>
     readonly isReactive: UnwrapRef<typeof import('vue')['isReactive']>
@@ -711,7 +709,6 @@ declare module '@vue/runtime-core' {
     readonly refDefault: UnwrapRef<typeof import('@vueuse/core')['refDefault']>
     readonly refThrottled: UnwrapRef<typeof import('@vueuse/core')['refThrottled']>
     readonly refWithControl: UnwrapRef<typeof import('@vueuse/core')['refWithControl']>
-    readonly requestDevicePermission: UnwrapRef<typeof import('./src/composables/device/edger-device')['requestDevicePermission']>
     readonly resolveComponent: UnwrapRef<typeof import('vue')['resolveComponent']>
     readonly resolveRef: UnwrapRef<typeof import('@vueuse/core')['resolveRef']>
     readonly resolveUnref: UnwrapRef<typeof import('@vueuse/core')['resolveUnref']>
@@ -730,7 +727,7 @@ declare module '@vue/runtime-core' {
     readonly toRef: UnwrapRef<typeof import('vue')['toRef']>
     readonly toRefs: UnwrapRef<typeof import('vue')['toRefs']>
     readonly toValue: UnwrapRef<typeof import('vue')['toValue']>
-    readonly toggleDark: UnwrapRef<typeof import('./src/composables/dark')['toggleDark']>
+    readonly toggleDark: UnwrapRef<typeof import('./src/composables/utils/dark')['toggleDark']>
     readonly triggerRef: UnwrapRef<typeof import('vue')['triggerRef']>
     readonly tryOnBeforeMount: UnwrapRef<typeof import('@vueuse/core')['tryOnBeforeMount']>
     readonly tryOnBeforeUnmount: UnwrapRef<typeof import('@vueuse/core')['tryOnBeforeUnmount']>
@@ -757,6 +754,7 @@ declare module '@vue/runtime-core' {
     readonly useAsyncQueue: UnwrapRef<typeof import('@vueuse/core')['useAsyncQueue']>
     readonly useAsyncState: UnwrapRef<typeof import('@vueuse/core')['useAsyncState']>
     readonly useAttrs: UnwrapRef<typeof import('vue')['useAttrs']>
+    readonly useAuthFetch: UnwrapRef<typeof import('./src/composables/utils/use-auth-fetch')['useAuthFetch']>
     readonly useBase64: UnwrapRef<typeof import('@vueuse/core')['useBase64']>
     readonly useBattery: UnwrapRef<typeof import('@vueuse/core')['useBattery']>
     readonly useBluetooth: UnwrapRef<typeof import('@vueuse/core')['useBluetooth']>
@@ -788,10 +786,10 @@ declare module '@vue/runtime-core' {
     readonly useDocumentVisibility: UnwrapRef<typeof import('@vueuse/core')['useDocumentVisibility']>
     readonly useDraggable: UnwrapRef<typeof import('@vueuse/core')['useDraggable']>
     readonly useDropZone: UnwrapRef<typeof import('@vueuse/core')['useDropZone']>
-    readonly useEdgerOsEnv: UnwrapRef<typeof import('./src/composables/edger/web')['useEdgerOsEnv']>
-    readonly useEdgerOsOrientation: UnwrapRef<typeof import('./src/composables/edger/web')['useEdgerOsOrientation']>
-    readonly useEdgerOsSafeArea: UnwrapRef<typeof import('./src/composables/edger/web')['useEdgerOsSafeArea']>
-    readonly useEdgerOsTheme: UnwrapRef<typeof import('./src/composables/edger/web')['useEdgerOsTheme']>
+    readonly useEdgerOsEnv: UnwrapRef<typeof import('./src/composables/utils/edger-web-sdk')['useEdgerOsEnv']>
+    readonly useEdgerOsOrientation: UnwrapRef<typeof import('./src/composables/utils/edger-web-sdk')['useEdgerOsOrientation']>
+    readonly useEdgerOsSafeArea: UnwrapRef<typeof import('./src/composables/utils/edger-web-sdk')['useEdgerOsSafeArea']>
+    readonly useEdgerOsTheme: UnwrapRef<typeof import('./src/composables/utils/edger-web-sdk')['useEdgerOsTheme']>
     readonly useElementBounding: UnwrapRef<typeof import('@vueuse/core')['useElementBounding']>
     readonly useElementByPoint: UnwrapRef<typeof import('@vueuse/core')['useElementByPoint']>
     readonly useElementHover: UnwrapRef<typeof import('@vueuse/core')['useElementHover']>
@@ -803,7 +801,6 @@ declare module '@vue/runtime-core' {
     readonly useEyeDropper: UnwrapRef<typeof import('@vueuse/core')['useEyeDropper']>
     readonly useFavicon: UnwrapRef<typeof import('@vueuse/core')['useFavicon']>
     readonly useFetch: UnwrapRef<typeof import('@vueuse/core')['useFetch']>
-    readonly useFetchDevice: UnwrapRef<typeof import('./src/composables/device/edger-device')['useFetchDevice']>
     readonly useFileDialog: UnwrapRef<typeof import('@vueuse/core')['useFileDialog']>
     readonly useFileSystemAccess: UnwrapRef<typeof import('@vueuse/core')['useFileSystemAccess']>
     readonly useFocus: UnwrapRef<typeof import('@vueuse/core')['useFocus']>

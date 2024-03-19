@@ -1,7 +1,7 @@
+/*
 import { defineStore } from 'pinia'
 import { LightState } from '..'
 import { useFetchDevice, toDevice } from '../device/edger-device'
-
 
 export const useLightStore = defineStore('light', {
   state: (): LightState => {
@@ -29,7 +29,7 @@ export const useLightStore = defineStore('light', {
   }
 }
 )
-
+*/
 
 // state: (): LightState => {
 //   return {

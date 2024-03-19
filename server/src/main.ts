@@ -1,4 +1,3 @@
-import { HttpServer } from 'http'
 import WebApp from 'webapp'
 import iosched from 'iosched'
 
@@ -9,53 +8,54 @@ import { WsServer } from 'websocket'
 
 import permission from 'async/permission'
 import socket from 'socket'
-import deviceRoute from './routes/device'
-import debugRoute from './routes/debug'
 
 import { checkPermission, getIfnames } from './lib/utils'
 
-// import { log } from 'edgeros:console'
+import { CameraManager } from './lib/media/camera-manager'
+import { StatePusher } from './lib/socket'
+import { kvdb } from './lib/db'
 
-import { CameraManager } from './lib/media/cam_media'
+import { deviceRoute, mediaRoute } from './routes'
 
-// console.inspectEnable = true
-
-// import SocketIO from 'socket.io'
-
-// const server = new SocketIO(app, {
-//   path: "/socket/"
-// })
-
-import { DeviceStatePush } from './routes/push'
-
-const app = WebApp.createApp()
-
-// * routes
-// app.use('/api/device', deviceRoute)
-app.use('/api/debug', debugRoute)
+import { DeviceManager } from './lib/device/device-manager'
+import { toDevice } from './lib/device/device-enhance'
 
 console.inspectEnable = true
+
+const app = WebApp.createApp()
 
 // * middlewares
 app.use(WebApp.static('./public'))
 app.use(bodyParser.json())
 app.use(bodyParser.urlencoded())
 
-const pusher = new DeviceStatePush(app, {
+// * routes
+// app.use('/api/device', deviceRoute)
+// app.use('/api/media', mediaRoute)
+
+const pusher = new StatePusher(app, {
   path: '/socket/device-push',
   allowUpgrades: true,
 })
-pusher.socketServer.sockets.on('connection', () => {
-  pusher.report({ msg: 'connect' })
+pusher.listenAll('connection', () => {
+  pusher.send('hello-test', { msg: 'connected' })
 })
-
-// pusher.send('camera:stream', { msg: 'haha' })
 
 const camMan = new CameraManager()
 
+// create onvif discovery server
 getIfnames().then(res => camMan.createOnvifDiscovery(Object.values(res)))
+
 camMan.on('ready', (urn) => {
-  camMan.loginCamera(urn, 'admin', '123456')
+  const cameraAuth = kvdb.get('cameras')[urn]
+  if (cameraAuth) {
+    const { username, password } = cameraAuth
+    console.info('[CameraManager] try login with', cameraAuth)
+    camMan.loginCamera(urn, username, password)
+  }
+})
+camMan.on('login-error', (urn) => {
+  pusher.send('camera:login-error', urn)
 })
 
 camMan.on('login', async (urn) => {
@@ -67,8 +67,28 @@ camMan.on('login', async (urn) => {
   console.log(res)
 })
 
-pusher.socketServer.sockets.on('stream:get', (cb) => {
-  cb({ msg: 'ok' })
+app.get('/camera/list', (req, res) => {
+  res.json({ cameras: camMan.getCamList() })
+})
+
+const devMan = new DeviceManager()
+
+devMan.init()
+
+devMan.on('init', async () => {
+  const info = devMan.getDeviceList()
+  const devid = info[0].devid
+  const control = await devMan.getDeviceControl(devid)
+  // const { pack } = toDevice().set({ state: 'on', initial: 'on' }).value
+  const { pack } = toDevice().get(['state', 'initial']).value
+  console.log(pack)
+  const res = await control.send(pack, 0)
+  console.log(res)
+})
+
+devMan.on('device:message', (devid, msg) => {
+  console.log(devid, msg)
+  pusher.report({ devid, msg })
 })
 
 // import { DeviceManager } from './lib/device/device-manager'
@@ -76,6 +96,39 @@ pusher.socketServer.sockets.on('stream:get', (cb) => {
 // const deviceManager = new DeviceManager()
 // deviceManager.init()
 // deviceManager.push(pusher)
+
+// * debug logger
+app.use(function (req, res, next) {
+  console.info(`[${req.path}] ${req.method}`)
+  next()
+})
+
+app.get('/api/device/list', (req, res) => {
+  res.json({ list: devMan.getDeviceList() })
+})
+
+// app.get('/api/device/state/list',(req,res)=>{
+// console.info('[/api/device/state/list] get')
+//
+// })
+
+app.post('/api/device/control', (req, res) => {
+  console.log(req.body)
+  res.json({ msg: 'ok' })
+})
+
+app.get('/api/camera/list', (req, res) => {
+  res.json({ list: camMan.getCamList() })
+})
+
+app.post('/api/camera/login', (req, res) => {
+  // console.log(req.body)
+  const { username, password, urn } = req.body
+  console.info('[CameraManager] try login with', { username, password })
+  camMan.loginCamera(urn, username, password)
+  //
+  res.json({ msg: 'yes' })
+})
 
 // * start app
 app.start()

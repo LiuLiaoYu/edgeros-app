@@ -1,13 +1,14 @@
 <script lang="ts" setup>
 import mpegts from 'mpegts.js'
-import textVideo from '~/assets/video.mp4'
+import { showToast } from 'vant'
+
+// import textVideo from '~/assets/video.mp4'
 
 const props = defineProps<{
   url: string
 }>()
 
-const source = ref()
-const canvas = ref()
+const err = ref('')
 
 class CanvasFlvMedia {
   sourceId: string
@@ -28,26 +29,48 @@ class CanvasFlvMedia {
     this.canvasContext = this.canvas.getContext('2d') as CanvasRenderingContext2D
   }
 
-  callback() {
-    this.canvasContext!.drawImage(this.source!, 0, 0, 200, 300)
-  }
-
-  connect(url: string) {
-    if (mpegts.getFeatureList().mseLivePlayback) {
-      this.player = mpegts.createPlayer({
-        type: 'flv',
-        isLive: true,
-        url,
-      })
-      this.player.attachMediaElement(this.source!)
-      this.player.load()
+  destroyPlayer() {
+    if (this.player) {
+      this.player.pause()
+      this.player.unload()
+      this.player.detachMediaElement()
+      this.player.destroy()
     }
   }
 
+  connect(url: string) {
+    // 清理上一个
+    if (this.player)
+      this.destroyPlayer()
+    if (mpegts.getFeatureList().mseLivePlayback) {
+      // showToast('here!')
+      showToast(mpegts.isSupported())
+      // err.value = ''
+      this.player = mpegts.createPlayer({ type: 'flv', isLive: true, url }, {
+        // enableWorker: true, // 启用分离的线程进行转换
+        // enableStashBuffer: false, // 关闭IO隐藏缓冲区
+        // stashInitialSize: 128, // 减少首帧显示等待时长
+      })
+      this.player.attachMediaElement(this.source!)
+      this.player.load()
+      this.player.play()
+      this.player.on(mpegts.Events.ERROR, (e) => {
+        // console.log(e)
+        err.value = e
+        // destroy
+
+        // 进行重建的逻辑，这里不再展开
+        // this.init()
+      })
+    }
+    console.log(this.player!.currentTime)
+  }
+
   play(intervals: number) {
-    this.player!.play()
     // this.player!.on('play', () => {
-    this.timer = setInterval(this.callback, intervals)
+    this.timer = setInterval(() => {
+      this.callback()
+    }, intervals)
     // })
   }
 
@@ -55,54 +78,17 @@ class CanvasFlvMedia {
     this.player!.pause()
     clearInterval(this.timer)
   }
+
+  callback() {
+    this.canvasContext!.drawImage(this.source!, 0, 0, 200, 300)
+  }
 }
-
-// class Media
-
-// function func() {
-//   const ctx = canvas.value.getContext('2d')
-
-//   const width = source.value.videoWidth
-//   const height = source.value.videoHeight
-
-//   function callback() {
-
-//     setTimeout(() => {
-//       callback()
-//     }, 0)
-//   }
-//   callback()
-// }
-
-// onMounted(() => {
-// const width = source.value.videoWidth
-// const height = source.value.videoHeight
-// console.log(ctx)
-// console.log(width, height)
-// function callback() {
-
-// }
-// callback()
-// })
 
 const url = `wss://${document.domain}:${window.location.port}/stream?${authTokenQuery.value}`
+const dataSocket = `wss://${document.domain}:${window.location.port}/data?${authTokenQuery.value}`
 
-let ctx
-
-function play() {
-  source.value.play()
-  ctx = canvas.value.getContext('2d')
-  // console.log(ctx)
-  function callback() {
-    // if (source.value.)
-    // ctx.fillStyle = 'green'
-    ctx.drawImage(source.value, 0, 0, 200, 300)
-    setTimeout(() => {
-      callback()
-    }, 0)
-  }
-  callback()
-}
+// const socket = new WebSocket("ws://localhost:8080");
+const socket = new WebSocket(dataSocket)
 
 const monitor = new CanvasFlvMedia('source', 'canvas')
 
@@ -114,15 +100,18 @@ onMounted(() => {
 <template>
   <div>
     <div>
-      <video id="source" h-0 />
-      <canvas id="canvas" />
+      <video id="source" />
+      <div border="1 gray solid" bg-gray-200>
+        <canvas id="canvas" />
+      </div>
     </div>
-    <button @click="monitor.connect(url)">
-      connect
-    </button>
-    <button @click="monitor.play()">
+    <div>{{ err }}</div>
+    <van-button type="primary" @click="monitor.connect(url)">
+      连接
+    </van-button>
+    <van-button type="primary" @click="monitor.play()">
       play
-    </button>
+    </van-button>
   </div>
 </template>
 

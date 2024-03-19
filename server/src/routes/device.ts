@@ -1,9 +1,8 @@
-import Router from "../WebRouter"
-// import { getDeviceList } from "./device-manager"
+import Router from './web-router'
 
-const deviceRoute = new Router()
+const route = new Router()
 
-deviceRoute.get("/list", async (req, res) => {
+route.get('/list', async (req, res) => {
   res.json({ name: null })
   // const list1 = await getDeviceList(true)
   // const list2 = await getDeviceList(false)
@@ -11,5 +10,4 @@ deviceRoute.get("/list", async (req, res) => {
   // res.json({ joinTrue: list1, joinFalse: list2 })
 })
 
-
-export default deviceRoute
+export default route

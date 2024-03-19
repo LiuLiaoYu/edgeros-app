@@ -314,6 +314,7 @@
     "streamUri": true,
     "authTokenQuery": true,
     "useEdgerOsAuthToken": true,
-    "socketClient": true
+    "socketClient": true,
+    "useAuthFetch": true
   }
 }

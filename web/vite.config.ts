@@ -25,6 +25,21 @@ export default defineConfig({
     },
   },
   plugins: [
+    AutoImport({
+      imports: [
+        'vue',
+        'vue-router',
+        '@vueuse/core',
+      ],
+      dts: true,
+      dirs: [
+        './src/composables/**',
+      ],
+      vueTemplate: true,
+      eslintrc: {
+        enabled: true, // Default `false`
+      },
+    }),
     VueRouter({
       dts: true,
       routesFolder: 'src/pages/',
@@ -42,23 +57,6 @@ export default defineConfig({
             defineModel: true,
           },
         }),
-      },
-    }),
-    AutoImport({
-      imports: [
-        'vue',
-        'vue-router',
-        '@vueuse/core',
-      ],
-      dts: true,
-      dirs: [
-        './src/composables',
-      ],
-      vueTemplate: true,
-      eslintrc: {
-        enabled: true, // Default `false`
-        filepath: './.eslintrc-auto-import.json', // Default `./.eslintrc-auto-import.json`
-        globalsPropValue: true, // Default `true`, (true | false | 'readonly' | 'readable' | 'writable' | 'writeable')
       },
     }),
     Components({

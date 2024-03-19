@@ -25,6 +25,12 @@ export default defineConfig({
     'events',
     'mediadecoder',
     '@edgeros/jsre-onvif',
+    'socket.io',
+    'url',
+    'webmedia',
+    'websocket',
+    'handnn',
+    'lightkv',
   ],
 
 })

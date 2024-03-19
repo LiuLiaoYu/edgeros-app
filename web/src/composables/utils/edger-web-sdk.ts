@@ -4,7 +4,7 @@ import type { EdgerEnv, EdgerOrientationValue, SafeArea } from '@edgeros/web-sdk
 export function useEdgerOsOrientation() {
   const orientation = ref<EdgerOrientationValue>()
   const handler = (data: any) => { orientation.value = data.orientation }
-  edger.orientation.state().then()
+  edger.orientation.state().then(handler)
   edger.onAction('orientation', handler)
   return orientation
 }

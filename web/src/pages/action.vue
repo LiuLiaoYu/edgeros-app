@@ -25,7 +25,7 @@ function onRefresh() {
     <!-- <p>刷新次数: {{ count }}</p> -->
     <div w-100vw>
       <van-cell-group title="可控制设备">
-        <template v-for="(info, idx) in data.list" :key="idx">
+        <template v-for="(info, idx) in data.list ?? []" :key="idx">
           <van-cell :title="info.label" :value="info.devid" @click="showPopup()" />
         </template>
       </van-cell-group>

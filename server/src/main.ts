@@ -9,6 +9,7 @@ import { WsServer } from 'websocket'
 import permission from 'async/permission'
 import socket from 'socket'
 
+import * as tf from '@tensorflow/tfjs'
 import { checkPermission, getIfnames } from './lib/utils'
 
 import { CameraManager } from './lib/media/camera-manager'
@@ -61,7 +62,7 @@ camMan.on('login-error', (urn) => {
 camMan.on('login', async (urn) => {
   const ps = camMan.getCamProfiles(urn)
   console.log(ps)
-  const res = await camMan.createStreamServer(urn, ps[0].uri, app)
+  const res = await camMan.createStreamServer(urn, ps[1].uri, app, pusher)
   pusher.send('camera:stream', res)
   pusher.report(res)
   console.log(res)
@@ -75,27 +76,21 @@ const devMan = new DeviceManager()
 
 devMan.init()
 
-devMan.on('init', async () => {
-  const info = devMan.getDeviceList()
-  const devid = info[0].devid
-  const control = await devMan.getDeviceControl(devid)
-  // const { pack } = toDevice().set({ state: 'on', initial: 'on' }).value
-  const { pack } = toDevice().get(['state', 'initial']).value
-  console.log(pack)
-  const res = await control.send(pack, 0)
-  console.log(res)
-})
+// devMan.on('init', async () => {
+//   const info = devMan.getDeviceList()
+//   const devid = info[0].devid
+//   const control = await devMan.getDeviceControl(devid)
+//   // const { pack } = toDevice().set({ state: 'on', initial: 'on' }).value
+//   const { pack } = toDevice().get(['state', 'initial']).value
+//   console.log(pack)
+//   const res = await control.send(pack, 0)
+//   console.log(res)
+// })
 
 devMan.on('device:message', (devid, msg) => {
   console.log(devid, msg)
   pusher.report({ devid, msg })
 })
-
-// import { DeviceManager } from './lib/device/device-manager'
-// import { toDevice } from "./lib/device/device-enhance";
-// const deviceManager = new DeviceManager()
-// deviceManager.init()
-// deviceManager.push(pusher)
 
 // * debug logger
 app.use(function (req, res, next) {
@@ -107,11 +102,6 @@ app.get('/api/device/list', (req, res) => {
   res.json({ list: devMan.getDeviceList() })
 })
 
-// app.get('/api/device/state/list',(req,res)=>{
-// console.info('[/api/device/state/list] get')
-//
-// })
-
 app.post('/api/device/control', (req, res) => {
   console.log(req.body)
   res.json({ msg: 'ok' })
@@ -122,13 +112,16 @@ app.get('/api/camera/list', (req, res) => {
 })
 
 app.post('/api/camera/login', (req, res) => {
-  // console.log(req.body)
   const { username, password, urn } = req.body
   console.info('[CameraManager] try login with', { username, password })
   camMan.loginCamera(urn, username, password)
-  //
   res.json({ msg: 'yes' })
 })
+
+// console.log(tf.getBackend())
+
+// const a = tf.tensor([[1, 2], [3, 4]])
+// console.log(a)
 
 // * start app
 app.start()

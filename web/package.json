@@ -13,6 +13,7 @@
     "@unocss/reset": "^0.58.5",
     "@vueuse/core": "^10.9.0",
     "axios": "^1.6.7",
+    "flv.js": "^1.6.2",
     "mpegts.js": "^1.7.3",
     "pinia": "^2.1.7",
     "query-string": "^9.0.0",

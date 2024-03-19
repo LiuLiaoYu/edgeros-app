@@ -7,13 +7,18 @@ import MediaDecoder from 'mediadecoder'
 import WebMedia from 'webmedia'
 
 import { WsServer } from 'websocket'
+import handnn from 'handnn'
+import facenn from 'facenn'
+
+import type { StatePusher } from '../socket'
 
 // import facenn from 'facenn'
-import handnn from 'handnn'
 
 // const WsServer = require('websocket').WsServer
 
 // import { checkPerm, getIfnames } from '../utils'
+
+// import * as handTrack from '../handtrack.min'
 
 console.inspectEnable = true
 
@@ -29,6 +34,28 @@ export interface CameraInfo {
   _invalids: number
   username?: string
   password?: string
+}
+
+class SeqDetect extends EventEmitter {
+  lockList: [number, number][]
+  lockFrameNum: number = 10
+  pos?: [number, number]
+  isLock: boolean
+  lastPos?: [number, number]
+  constructor() {
+    super()
+    this.isLock = false
+  }
+
+  push(frame) {
+
+  }
+
+  state(frame) {
+
+  }
+
+  detect() { }
 }
 
 export class CameraManager extends EventEmitter {
@@ -135,25 +162,35 @@ export class CameraManager extends EventEmitter {
     return this.profileMap.get(urn)
   }
 
-  async createStreamServer(urn: string, uri: string, app) {
+  async createStreamServer(urn: string, uri: string, app, socket?: StatePusher) {
     const { protocol, host, pathname } = new URL(uri)
     const { username, password } = this.cameraMap.get(urn)
     const rtspUri = `${protocol}://${username}:${password}@${host}${pathname}`
     console.log(rtspUri)
 
-    const dataSocket = WsServer.createServer(`/data`, app)
+    // dataSocket.start()
+    // dataSocket.on('start', () => {
+    //   console.log('ws started')
+    // })
+
+    // dataSocket.on('connection', () => {
+    //   console.log('--> connected')
+    // })
+
+    // const dataSocket = WsServer.createServer(`/data`, app)
     const streamSocket = WsServer.createServer('/stream', app)
     const opts = {
       mode: 1,
       mediaSource: { source: 'flv' },
       streamChannel: { protocol: 'ws', server: streamSocket },
-      dataChannel: { protocol: 'ws', server: dataSocket },
+      // dataChannel: { protocol: 'ws', server: dataSocket },
     }
     // const handnn = require('handnn')
     const server = WebMedia.createServer(opts, app)
     const netcam = new MediaDecoder()
+
+    // const model = await handTrack.load()
     server.on('start', () => {
-      console.log('this')
       netcam.open(rtspUri, { proto: 'tcp' }, 10000)
 
       // netcam.destVideoFormat({ width: 640, height: 360, fps: 15, pixelFormat: MediaDecoder.PIX_FMT_RGB24, noDrop: false, disable: false })
@@ -161,7 +198,7 @@ export class CameraManager extends EventEmitter {
       netcam.destVideoFormat({
         width: 640,
         height: 360,
-        fps: 1,
+        fps: 15,
         pixelFormat: MediaDecoder.PIX_FMT_BGR24,
         disable: false,
       })
@@ -174,24 +211,24 @@ export class CameraManager extends EventEmitter {
         format: 'flv',
       })
 
-      const ol = netcam.overlay()
-      ol.line(0, 0, 80, 80, MediaDecoder.C_RED, 4)
       netcam.on('video', (video) => {
         const buf = new Buffer(video.arrayBuffer)
         const hands = handnn.detect(buf, { width: 640, height: 360, pixelFormat: handnn.PIX_FMT_BGR24 })
+        // const faces = facenn.detect(buf, { width: 640, height: 360, pixelFormat: facenn.PIX_FMT_BGR2RGB24 })
 
-        // console.log(hands)
-        // ol.clear()
-        // if (hands.length) {
-        //   for (let i = 0; i < hands.length; i++) {
-        //     const info = hands[i]
-        //     if (info.prob > 0.5) {
-        //       // draw rectangle
-        //       ol.rect(info.x0, info.y0, info.x1, info.y1, MediaDecoder.C_RED, 2, 0, false)
-        //     }
-        //   }
-        // }
-        server.sendData(hands)
+        const fingers = hands.map((hand) => {
+          const f = handnn.identify(buf, { width: 640, height: 360, pixelFormat: handnn.PIX_FMT_BGR24 }, hand)
+          const { base, fingers } = f
+          return { base, curlNum: fingers.map(finger => finger.curl).filter(x => x).length }
+        })
+
+        // handnn.identify()
+        // console.log('vide')
+        // const da = Buffer.from(JSON.stringify({ hands }))
+
+        // server.sendData(da)
+        // server.
+        socket.send('camera:data', { hands, fingers })
       })
 
       netcam.on('remux', (frame) => {
@@ -209,7 +246,6 @@ export class CameraManager extends EventEmitter {
       netcam.start()
     })
 
-    console.log('here')
     server.start()
 
     return {

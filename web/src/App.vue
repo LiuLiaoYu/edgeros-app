@@ -1,20 +1,11 @@
 <script setup lang="ts">
 import { socketClient } from './composables/sockets'
 
-// let devid = ''
-
-// let data
-// async function fun() {
-//   data = await getDeviceList()
-//   console.log(data)
-//   devid = data.value.data[0].devid as string
-//   await requestDevicePermission([devid])
-// }
-
-// function sleep(delay: number) {
-//   return new Promise(resolve => setTimeout(resolve, delay))
-// }
-// const light = useLightStore()
+socketClient.init({
+  path: '/socket/device-push',
+  query: authTokenHeader.value,
+  transports: ['websocket'],
+})
 </script>
 
 <template>
@@ -22,7 +13,9 @@ import { socketClient } from './composables/sockets'
     <van-config-provider theme="light">
       <router-view v-slot="{ Component, route }">
         <transition :name="route.meta.transition">
-          <component :is="Component" />
+          <keep-alive>
+            <component :is="Component" />
+          </keep-alive>
         </transition>
       </router-view>
 

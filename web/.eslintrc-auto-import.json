@@ -315,6 +315,8 @@
     "authTokenQuery": true,
     "useEdgerOsAuthToken": true,
     "socketClient": true,
-    "useAuthFetch": true
+    "useAuthFetch": true,
+    "SocketClient": true,
+    "CanvasFlvMedia": true
   }
 }

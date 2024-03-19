@@ -1,6 +1,4 @@
 <script lang="ts" setup>
-const s = `wss://${document.domain}:${window.location.port}/stream`
-
 const { isFetching, data, error, execute } = useAuthFetch('/api/camera/list').json()
 
 const showBottom = ref(false)
@@ -10,7 +8,6 @@ const password = ref('123456')
 const urnId = ref('')
 
 function showPopup(urn) {
-  console.log(urn)
   showBottom.value = true
   urnId.value = urn
 }
@@ -22,25 +19,41 @@ function loginCamera() {
     urn: urnId.value,
   }
 
-  console.log(data)
-
   const login = useAuthFetch('/api/camera/login').post(data).json()
 }
+
+// try {
+//   const dataSocketUrl = `wss://${document.domain}:${window.location.port}/data?${authTokenQuery.value}`
+//   const ws = new WebSocket(dataSocketUrl)
+//   console.log(ws)
+//   // Connection opened
+//   ws.addEventListener('open', (event) => {
+//     // ws.send('Hello Server!')
+//     console.log('open')
+//   })
+
+//   // Listen for messages
+//   ws.addEventListener('message', (event) => {
+//     console.log('Message from server ', event.data)
+//   })
+// }
+// catch (err) {
+//   console.log(err)
+// }
 </script>
 
 <template>
-  {{ data }}
   <div mt-2em w-100vw>
     <van-cell-group inset>
       <van-cell title="192.168.128.34" />
       <van-cell>
-        <CameraMonitor :url="s" />
+        <CameraMonitor />
       </van-cell>
     </van-cell-group>
     <van-divider />
 
     <van-cell-group inset>
-      <template v-for="(info, idx) in data.list" :key="idx">
+      <template v-for="(info, idx) in data?.list ?? []" :key="idx">
         <!-- <van-cell title="添加视频流" is-link arrow-direction="up" @click="showPopup" /> -->
         <van-cell is-link arrow-direction="up" @click="showPopup(info.urn)">
           <template #title>
@@ -53,6 +66,10 @@ function loginCamera() {
         </van-cell>
       </template>
     </van-cell-group>
+
+    <van-button @click="() => { execute() }">
+      refresh
+    </van-button>
 
     <van-popup v-model:show="showBottom" round :style="{ padding: '1em' }">
       <van-form @submit="loginCamera()">

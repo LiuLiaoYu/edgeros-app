@@ -5,7 +5,9 @@
     "dev": "rollup -c -w"
   },
   "dependencies": {
-    "@edgeros/jsre-onvif": "^1.0.1"
+    "@edgeros/jsre-onvif": "^1.0.1",
+    "@tensorflow/tfjs": "^4.17.0",
+    "handtrackjs": "^0.1.5"
   },
   "optionalDependencies": {
     "bufferutil": "^4.0.8"

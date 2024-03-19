@@ -24,8 +24,10 @@ async function getIfnames() {
     };
 }
 
+// import facenn from 'facenn'
 // const WsServer = require('websocket').WsServer
 // import { checkPerm, getIfnames } from '../utils'
+// import * as handTrack from '../handtrack.min'
 console.inspectEnable = true;
 class CameraManager extends EventEmitter {
     constructor() {
@@ -114,31 +116,38 @@ class CameraManager extends EventEmitter {
     getCamProfiles(urn) {
         return this.profileMap.get(urn);
     }
-    async createStreamServer(urn, uri, app) {
+    async createStreamServer(urn, uri, app, socket) {
         const { protocol, host, pathname } = new URL(uri);
         const { username, password } = this.cameraMap.get(urn);
         const rtspUri = `${protocol}://${username}:${password}@${host}${pathname}`;
         console.log(rtspUri);
-        const dataSocket = websocket.WsServer.createServer(`/data`, app);
+        // dataSocket.start()
+        // dataSocket.on('start', () => {
+        //   console.log('ws started')
+        // })
+        // dataSocket.on('connection', () => {
+        //   console.log('--> connected')
+        // })
+        // const dataSocket = WsServer.createServer(`/data`, app)
         const streamSocket = websocket.WsServer.createServer('/stream', app);
         const opts = {
             mode: 1,
             mediaSource: { source: 'flv' },
             streamChannel: { protocol: 'ws', server: streamSocket },
-            dataChannel: { protocol: 'ws', server: dataSocket },
+            // dataChannel: { protocol: 'ws', server: dataSocket },
         };
         // const handnn = require('handnn')
         const server = WebMedia.createServer(opts, app);
         const netcam = new MediaDecoder();
+        // const model = await handTrack.load()
         server.on('start', () => {
-            console.log('this');
             netcam.open(rtspUri, { proto: 'tcp' }, 10000);
             // netcam.destVideoFormat({ width: 640, height: 360, fps: 15, pixelFormat: MediaDecoder.PIX_FMT_RGB24, noDrop: false, disable: false })
             // netcam.destAudioFormat({ disable: true })
             netcam.destVideoFormat({
                 width: 640,
                 height: 360,
-                fps: 1,
+                fps: 15,
                 pixelFormat: MediaDecoder.PIX_FMT_BGR24,
                 disable: false,
             });
@@ -150,23 +159,21 @@ class CameraManager extends EventEmitter {
                 enableAudio: false,
                 format: 'flv',
             });
-            const ol = netcam.overlay();
-            ol.line(0, 0, 80, 80, MediaDecoder.C_RED, 4);
             netcam.on('video', (video) => {
                 const buf = new Buffer(video.arrayBuffer);
                 const hands = handnn.detect(buf, { width: 640, height: 360, pixelFormat: handnn.PIX_FMT_BGR24 });
-                // console.log(hands)
-                // ol.clear()
-                // if (hands.length) {
-                //   for (let i = 0; i < hands.length; i++) {
-                //     const info = hands[i]
-                //     if (info.prob > 0.5) {
-                //       // draw rectangle
-                //       ol.rect(info.x0, info.y0, info.x1, info.y1, MediaDecoder.C_RED, 2, 0, false)
-                //     }
-                //   }
-                // }
-                server.sendData(hands);
+                // const faces = facenn.detect(buf, { width: 640, height: 360, pixelFormat: facenn.PIX_FMT_BGR2RGB24 })
+                const fingers = hands.map((hand) => {
+                    const f = handnn.identify(buf, { width: 640, height: 360, pixelFormat: handnn.PIX_FMT_BGR24 }, hand);
+                    const { base, fingers } = f;
+                    return { base, curlNum: fingers.map(finger => finger.curl).filter(x => x).length };
+                });
+                // handnn.identify()
+                // console.log('vide')
+                // const da = Buffer.from(JSON.stringify({ hands }))
+                // server.sendData(da)
+                // server.
+                socket.send('camera:data', { hands, fingers });
             });
             netcam.on('remux', (frame) => {
                 const buf = Buffer.from(frame.arrayBuffer);
@@ -180,7 +187,6 @@ class CameraManager extends EventEmitter {
             console.log(netcam.info());
             netcam.start();
         });
-        console.log('here');
         server.start();
         return {
             protocol: 'wss',
@@ -286,30 +292,6 @@ if (!kvdb.has('cameras'))
     kvdb.set('cameras', {});
 
 // instruction wrapper
-class InstructionWrapper {
-    constructor(devid) {
-        this.value = {};
-        if (devid)
-            this.value.devid = devid;
-    }
-    static to(devid) {
-        return new InstructionWrapper(devid);
-    }
-    set(data) {
-        this.value.pack = { method: 'set', data };
-        return this;
-    }
-    get(data) {
-        this.value.pack = { method: 'get', data };
-        return this;
-    }
-    unwrap() {
-        return this.value;
-    }
-}
-function toDevice(devid) {
-    return new InstructionWrapper(devid);
-}
 function filterDeviceInfo(devid, info) {
     return {
         devid,
@@ -508,7 +490,7 @@ camMan.on('login-error', (urn) => {
 camMan.on('login', async (urn) => {
     const ps = camMan.getCamProfiles(urn);
     console.log(ps);
-    const res = await camMan.createStreamServer(urn, ps[0].uri, app);
+    const res = await camMan.createStreamServer(urn, ps[1].uri, app, pusher);
     pusher.send('camera:stream', res);
     pusher.report(res);
     console.log(res);
@@ -518,25 +500,20 @@ app.get('/camera/list', (req, res) => {
 });
 const devMan = new DeviceManager();
 devMan.init();
-devMan.on('init', async () => {
-    const info = devMan.getDeviceList();
-    const devid = info[0].devid;
-    const control = await devMan.getDeviceControl(devid);
-    // const { pack } = toDevice().set({ state: 'on', initial: 'on' }).value
-    const { pack } = toDevice().get(['state', 'initial']).value;
-    console.log(pack);
-    const res = await control.send(pack, 0);
-    console.log(res);
-});
+// devMan.on('init', async () => {
+//   const info = devMan.getDeviceList()
+//   const devid = info[0].devid
+//   const control = await devMan.getDeviceControl(devid)
+//   // const { pack } = toDevice().set({ state: 'on', initial: 'on' }).value
+//   const { pack } = toDevice().get(['state', 'initial']).value
+//   console.log(pack)
+//   const res = await control.send(pack, 0)
+//   console.log(res)
+// })
 devMan.on('device:message', (devid, msg) => {
     console.log(devid, msg);
     pusher.report({ devid, msg });
 });
-// import { DeviceManager } from './lib/device/device-manager'
-// import { toDevice } from "./lib/device/device-enhance";
-// const deviceManager = new DeviceManager()
-// deviceManager.init()
-// deviceManager.push(pusher)
 // * debug logger
 app.use(function (req, res, next) {
     console.info(`[${req.path}] ${req.method}`);
@@ -545,10 +522,6 @@ app.use(function (req, res, next) {
 app.get('/api/device/list', (req, res) => {
     res.json({ list: devMan.getDeviceList() });
 });
-// app.get('/api/device/state/list',(req,res)=>{
-// console.info('[/api/device/state/list] get')
-//
-// })
 app.post('/api/device/control', (req, res) => {
     console.log(req.body);
     res.json({ msg: 'ok' });
@@ -557,13 +530,14 @@ app.get('/api/camera/list', (req, res) => {
     res.json({ list: camMan.getCamList() });
 });
 app.post('/api/camera/login', (req, res) => {
-    // console.log(req.body)
     const { username, password, urn } = req.body;
     console.info('[CameraManager] try login with', { username, password });
     camMan.loginCamera(urn, username, password);
-    //
     res.json({ msg: 'yes' });
 });
+// console.log(tf.getBackend())
+// const a = tf.tensor([[1, 2], [3, 4]])
+// console.log(a)
 // * start app
 app.start();
 // * event loop

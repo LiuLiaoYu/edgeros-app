@@ -17,6 +17,7 @@ export class SocketClient {
 
   init(options) {
     this.client = io(options)
+
     this.client.on('connect', () => {
       console.info('socket connected')
     })

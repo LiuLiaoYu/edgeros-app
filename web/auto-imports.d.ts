@@ -8,6 +8,7 @@ declare global {
   const CanvasFlvMedia: typeof import('./src/composables/camera/index')['CanvasFlvMedia']
   const DevicePack: typeof import('./src/composables/device/edger-device')['DevicePack']
   const EffectScope: typeof import('vue')['EffectScope']
+  const InstructionWrapper: typeof import('./src/composables/device/edger-device')['InstructionWrapper']
   const SocketClient: typeof import('./src/composables/sockets/index')['SocketClient']
   const asyncComputed: typeof import('@vueuse/core')['asyncComputed']
   const authToken: typeof import('./src/composables/utils/edger-auth-token')['authToken']
@@ -325,8 +326,8 @@ declare module 'vue' {
   interface GlobalComponents {}
   interface ComponentCustomProperties {
     readonly CanvasFlvMedia: UnwrapRef<typeof import('./src/composables/camera/index')['CanvasFlvMedia']>
-    readonly DevicePack: UnwrapRef<typeof import('./src/composables/device/edger-device')['DevicePack']>
     readonly EffectScope: UnwrapRef<typeof import('vue')['EffectScope']>
+    readonly InstructionWrapper: UnwrapRef<typeof import('./src/composables/device/edger-device')['InstructionWrapper']>
     readonly SocketClient: UnwrapRef<typeof import('./src/composables/sockets/index')['SocketClient']>
     readonly asyncComputed: UnwrapRef<typeof import('@vueuse/core')['asyncComputed']>
     readonly authToken: UnwrapRef<typeof import('./src/composables/utils/edger-auth-token')['authToken']>
@@ -628,8 +629,8 @@ declare module '@vue/runtime-core' {
   interface GlobalComponents {}
   interface ComponentCustomProperties {
     readonly CanvasFlvMedia: UnwrapRef<typeof import('./src/composables/camera/index')['CanvasFlvMedia']>
-    readonly DevicePack: UnwrapRef<typeof import('./src/composables/device/edger-device')['DevicePack']>
     readonly EffectScope: UnwrapRef<typeof import('vue')['EffectScope']>
+    readonly InstructionWrapper: UnwrapRef<typeof import('./src/composables/device/edger-device')['InstructionWrapper']>
     readonly SocketClient: UnwrapRef<typeof import('./src/composables/sockets/index')['SocketClient']>
     readonly asyncComputed: UnwrapRef<typeof import('@vueuse/core')['asyncComputed']>
     readonly authToken: UnwrapRef<typeof import('./src/composables/utils/edger-auth-token')['authToken']>

@@ -44,7 +44,7 @@ export default defineConfig({
       dts: true,
       routesFolder: 'src/pages/',
       extensions: ['.vue'],
-      // importMode: 'sync',
+      importMode: 'sync',
       // routesFolder: './src/pages/',
     }),
     VueMacros({

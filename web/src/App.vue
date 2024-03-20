@@ -19,7 +19,7 @@ socketClient.init({
         </transition>
       </router-view>
 
-      <TabbarWrap show-debug-page />
+      <TabbarWrap />
 
       <van-number-keyboard safe-area-inset-bottom />
     </van-config-provider>

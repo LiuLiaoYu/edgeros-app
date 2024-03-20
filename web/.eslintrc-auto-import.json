@@ -317,6 +317,7 @@
     "socketClient": true,
     "useAuthFetch": true,
     "SocketClient": true,
-    "CanvasFlvMedia": true
+    "CanvasFlvMedia": true,
+    "InstructionWrapper": true
   }
 }

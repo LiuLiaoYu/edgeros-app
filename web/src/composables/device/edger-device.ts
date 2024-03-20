@@ -1,22 +1,34 @@
 import { edger } from '@edgeros/web-sdk'
 
-export class DevicePack {
-  value: any = {}
-  constructor(devid: string) {
-    this.value.devid = devid
+// instruction type
+export interface Instruction {
+  method: 'set' | 'get' | 'pair' | 'report'
+  data: any
+}
+
+// instruction wrapper
+export class InstructionWrapper {
+  value: {
+    devid?: string
+    pack?: Instruction
+  } = {}
+
+  constructor(devid?: string) {
+    if (devid)
+      this.value.devid = devid
   }
 
   static to(devid: string) {
-    return new DevicePack(devid)
+    return new InstructionWrapper(devid)
   }
 
   set(data: any) {
-    this.value.data = { method: 'set', data }
+    this.value.pack = { method: 'set', data }
     return this
   }
 
   get(data: any) {
-    this.value.data = { method: 'get', data }
+    this.value.pack = { method: 'get', data }
     return this
   }
 
@@ -24,23 +36,7 @@ export class DevicePack {
     return this.value
   }
 }
-export function toDevice(devid: string) {
-  return new DevicePack(devid)
+
+export function toDevice(devid?: string) {
+  return new InstructionWrapper(devid)
 }
-
-// export async function getDeviceList() {
-//   const { data } = await useFetchDevice('/list').get().json()
-//   return data
-// }
-
-// export async function requestDevicePermission(deviceIds: string[]) {
-//   const { success } = await edger.permission.request({ code: deviceIds, type: 'devices' })
-//   return success
-// }
-
-// export interface DevicePack {
-//   method: "get" | "set" | "report" | "pair",
-//   data: any
-// }
-
-// type DeviceMethod = "get" | "set" | "report" | "pair"

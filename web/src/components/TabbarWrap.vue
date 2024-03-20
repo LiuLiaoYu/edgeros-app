@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 defineProps<{
-  showDebugPage: boolean
+  showDebugPage?: boolean
 }>()
 
 // page switch animation
@@ -19,9 +19,9 @@ router.afterEach((to, from) => {
 </script>
 
 <template>
-  <van-tabbar route safe-area-inset-bottom>
+  <van-tabbar route safe-area-inset-bottom placeholder>
     <van-tabbar-item name="actions" replace to="/action">
-      <span>动作</span>
+      <span>设备</span>
       <template #icon>
         <div i-ri:home-gear-line />
       </template>

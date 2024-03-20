@@ -29,12 +29,86 @@ async function getIfnames() {
 // import { checkPerm, getIfnames } from '../utils'
 // import * as handTrack from '../handtrack.min'
 console.inspectEnable = true;
+class SeqDetect {
+    // |x - x1| + |y - y1| <= stayThreshold
+    constructor() {
+        // lockList: [number, number][]
+        this.lockFrameThreshold = 10;
+        // pattern1 : lock + close
+        this.lockCloseFrameThreshold = 20;
+        this.stayThreshold = 50;
+        this.isLock = false;
+        this.lastState = [false, false];
+        this.stateFrameNum = 0;
+        this.lastPos = [-1, -1];
+    }
+    clear() {
+        this.isLock = false;
+        this.lastState = [false, false];
+        this.stateFrameNum = 0;
+        this.lastPos = [-1, -1];
+    }
+    isOpen(fingers) {
+        return fingers.curlNum <= 2;
+    }
+    isStay(fingers) {
+        const dist = (this.lastPos[0] - fingers.base.x) + (this.lastPos[1] - fingers.base.y);
+        return this.lastPos[0] == -1 || dist <= this.stayThreshold;
+    }
+    isClose(fingers) {
+        return !this.isOpen(fingers);
+    }
+    isMove(fingers) {
+        return !this.isStay(fingers);
+    }
+    push(fingers) {
+        const pattern = this.detect(fingers);
+        this.lastPos[0] = fingers.base.x;
+        this.lastPos[1] = fingers.base.y;
+        return pattern;
+    }
+    getState(fingers) {
+        return [this.isOpen(fingers), this.isStay(fingers)];
+    }
+    detect(fingers) {
+        let pattern = -1;
+        const lastStateFrameNum = this.stateFrameNum;
+        // Open + Stay >= 10 frames
+        if (this.isOpen(fingers) && this.isStay(fingers) && this.stateFrameNum >= this.lockFrameThreshold) {
+            if (!this.isLock)
+                console.log('lock');
+            this.isLock = true;
+            this.stateFrameNum = 0;
+        }
+        if (this.isOpen(fingers) && this.isMove(fingers)) {
+            this.isLock = false;
+            this.stateFrameNum = 0;
+            // console.log('free');
+        }
+        // Pattern 1 : Lock + Close >= 20 frames
+        if (this.isLock && this.isClose(fingers) && this.stateFrameNum == this.lockCloseFrameThreshold)
+            pattern = 1;
+        // Pattern 2 : Lock + Close + Open, Close <= 20 frames
+        if (this.isLock && this.isOpen(fingers) && this.lastState[0] == false && lastStateFrameNum < this.lockCloseFrameThreshold)
+            pattern = 2;
+        const state = this.getState(fingers);
+        if (state[0] === this.lastState[0] && state[1] === this.lastState[1]) {
+            this.stateFrameNum++;
+        }
+        else {
+            this.stateFrameNum = 0;
+            this.lastState = [state[0], state[1]];
+        }
+        return pattern;
+    }
+}
 class CameraManager extends EventEmitter {
     constructor() {
         super();
         this.cameraMap = new Map();
         this.streamMap = new Map();
         this.profileMap = new Map();
+        this.detector = new SeqDetect();
     }
     createOnvifDiscovery(ifnames) {
         const nets = ifnames.map(item => ({ ifname: item, localPort: 0 }));
@@ -141,7 +215,7 @@ class CameraManager extends EventEmitter {
         const netcam = new MediaDecoder();
         // const model = await handTrack.load()
         server.on('start', () => {
-            netcam.open(rtspUri, { proto: 'tcp' }, 10000);
+            netcam.open(rtspUri, { proto: 'tcp', name: 'camera' }, 10000);
             // netcam.destVideoFormat({ width: 640, height: 360, fps: 15, pixelFormat: MediaDecoder.PIX_FMT_RGB24, noDrop: false, disable: false })
             // netcam.destAudioFormat({ disable: true })
             netcam.destVideoFormat({
@@ -168,12 +242,28 @@ class CameraManager extends EventEmitter {
                     const { base, fingers } = f;
                     return { base, curlNum: fingers.map(finger => finger.curl).filter(x => x).length };
                 });
+                if (fingers.length == 0) {
+                    this.detector.clear();
+                }
+                else {
+                    // console.log(fingers[0].base)
+                    // console.log(this.detector.lastState, this.detector.getState(fingers[0]), this.detector.lastState === this.detector.getState(fingers[0]), this.detector.stateFrameNum)
+                    const pattern = this.detector.push(fingers[0]);
+                    if (pattern != -1) {
+                        console.log('detect pattern = ', pattern);
+                        this.emit('action', pattern);
+                    }
+                }
+                // handnn.identify()
+                // console.log('vide')
+                // const da = Buffer.from(JSON.stringify({ hands }))
                 // handnn.identify()
                 // console.log('vide')
                 // const da = Buffer.from(JSON.stringify({ hands }))
                 // server.sendData(da)
                 // server.
-                socket.send('camera:data', { hands, fingers });
+                // const fingers = {}
+                socket.send('camera:data', { hands, fingers, isLock: this.detector.isLock });
             });
             netcam.on('remux', (frame) => {
                 const buf = Buffer.from(frame.arrayBuffer);
@@ -292,6 +382,30 @@ if (!kvdb.has('cameras'))
     kvdb.set('cameras', {});
 
 // instruction wrapper
+class InstructionWrapper {
+    constructor(devid) {
+        this.value = {};
+        if (devid)
+            this.value.devid = devid;
+    }
+    static to(devid) {
+        return new InstructionWrapper(devid);
+    }
+    set(data) {
+        this.value.pack = { method: 'set', data };
+        return this;
+    }
+    get(data) {
+        this.value.pack = { method: 'get', data };
+        return this;
+    }
+    unwrap() {
+        return this.value;
+    }
+}
+function toDevice(devid) {
+    return new InstructionWrapper(devid);
+}
 function filterDeviceInfo(devid, info) {
     return {
         devid,
@@ -303,12 +417,29 @@ function filterDeviceInfo(devid, info) {
 }
 
 // import type { DeviceInfo } from 'async/device' // * not export
+const deviceGetState = {
+    'plug': ['state', 'initial'],
+    'light.belt': ['state', 'bright', 'color'],
+};
+const deviceDefaultState = {
+    'plug': {
+        state: 'off',
+        initial: 'on',
+    },
+    'light.belt': {
+        state: 'off',
+        bright: 128,
+        color: [0, 232, 33],
+        start: 0,
+        end: 150,
+    },
+};
 class DeviceManager extends EventEmitter {
     constructor() {
         super();
         this.deviceInfo = new Map();
         this.deviceControl = new Map();
-        // this.deviceMap = new Map()
+        this.deviceState = new Map();
     }
     async init() {
         const deviceList = await Device.list(false);
@@ -317,21 +448,21 @@ class DeviceManager extends EventEmitter {
         }));
         deviceInfoList.forEach(([devid, info]) => {
             this.deviceInfo.set(devid, info);
+            const type = info.report.type;
+            this.deviceState.set(devid, { online: true, ...deviceDefaultState[type] });
         });
-        // Device.on('found', (devid, info) => {
-        // console.info()
-        // console.log('A new device was found:', devid, 'report:', info.report)
-        // })
         Device.on('join', (devid, info) => {
             console.info('[DeviceManager] new device join: ', JSON.stringify({ devid, info }));
             this.deviceInfo.set(devid, info);
+            const type = info.report.type;
+            this.deviceState.set(devid, { online: true, ...deviceDefaultState[type] });
             this.emit('device:join', devid);
-            // console.log('Device join in:', devid, 'report:', info.report)
         });
         Device.on('lost', (devid) => {
             // `Device` instance will be automatically released
             console.info('[DeviceManager] device lost: ', devid);
-            this.deviceInfo.delete(devid);
+            // this.deviceInfo.delete(devid)
+            this.deviceState.get(devid).online = false;
             this.deviceControl.delete(devid);
             this.emit('device:lost', devid);
         });
@@ -341,19 +472,32 @@ class DeviceManager extends EventEmitter {
     getDeviceList() {
         return [...this.deviceInfo.entries()].map(([devid, info]) => filterDeviceInfo(devid, info));
     }
+    getDeviceState() {
+        return Object.fromEntries(this.deviceState);
+    }
     async createDeviceControl(devid) {
         const device = new Device();
         try {
             const res = await device.request(devid);
+            this.deviceControl.set(devid, device);
             device.on('message', (msg) => {
                 this.emit('device:message', devid, msg);
+                if (msg.method === 'get')
+                    this.deviceState.set(devid, { ...this.deviceState.get(devid), ...msg.data });
             });
-            this.deviceControl.set(devid, device);
+            // init device state
+            const type = this.deviceInfo.get(devid).report.type;
+            const inst = toDevice(devid).get(deviceGetState[type]);
+            await this.deviceSend(inst);
         }
         catch (err) {
             console.info('[DeviceManager] failed to request control', devid);
-            // if()
         }
+    }
+    updateState(inst) {
+        const { devid, pack } = inst.value;
+        this.deviceState.set(devid, { ...this.deviceState.get(devid), ...pack.data });
+        console.log(this.deviceState.get(devid));
     }
     async getDeviceControl(devid) {
         if (!this.deviceControl.has(devid))
@@ -365,7 +509,6 @@ class DeviceManager extends EventEmitter {
         const control = this.deviceControl.get(devid);
         return await control.send(pack);
     }
-    async getDeviceState() { }
 }
 // getControlOf(devid: string) {
 //   if (this.deviceControl.has(devid)) { return this.deviceControl.get(devid) }
@@ -463,9 +606,6 @@ const app = WebApp.createApp();
 app.use(WebApp.static('./public'));
 app.use(middleware.bodyParser.json());
 app.use(middleware.bodyParser.urlencoded());
-// * routes
-// app.use('/api/device', deviceRoute)
-// app.use('/api/media', mediaRoute)
 const pusher = new StatePusher(app, {
     path: '/socket/device-push',
     allowUpgrades: true,
@@ -473,6 +613,7 @@ const pusher = new StatePusher(app, {
 pusher.listenAll('connection', () => {
     pusher.send('hello-test', { msg: 'connected' });
 });
+// *****************************************************
 const camMan = new CameraManager();
 // create onvif discovery server
 getIfnames().then(res => camMan.createOnvifDiscovery(Object.values(res)));
@@ -495,37 +636,6 @@ camMan.on('login', async (urn) => {
     pusher.report(res);
     console.log(res);
 });
-app.get('/camera/list', (req, res) => {
-    res.json({ cameras: camMan.getCamList() });
-});
-const devMan = new DeviceManager();
-devMan.init();
-// devMan.on('init', async () => {
-//   const info = devMan.getDeviceList()
-//   const devid = info[0].devid
-//   const control = await devMan.getDeviceControl(devid)
-//   // const { pack } = toDevice().set({ state: 'on', initial: 'on' }).value
-//   const { pack } = toDevice().get(['state', 'initial']).value
-//   console.log(pack)
-//   const res = await control.send(pack, 0)
-//   console.log(res)
-// })
-devMan.on('device:message', (devid, msg) => {
-    console.log(devid, msg);
-    pusher.report({ devid, msg });
-});
-// * debug logger
-app.use(function (req, res, next) {
-    console.info(`[${req.path}] ${req.method}`);
-    next();
-});
-app.get('/api/device/list', (req, res) => {
-    res.json({ list: devMan.getDeviceList() });
-});
-app.post('/api/device/control', (req, res) => {
-    console.log(req.body);
-    res.json({ msg: 'ok' });
-});
 app.get('/api/camera/list', (req, res) => {
     res.json({ list: camMan.getCamList() });
 });
@@ -535,10 +645,75 @@ app.post('/api/camera/login', (req, res) => {
     camMan.loginCamera(urn, username, password);
     res.json({ msg: 'yes' });
 });
-// console.log(tf.getBackend())
-// const a = tf.tensor([[1, 2], [3, 4]])
-// console.log(a)
+// *****************************************************
+const devMan = new DeviceManager();
+devMan.init();
+devMan.on('init', async () => {
+    const info = devMan.getDeviceList();
+    for (const dev of info) {
+        devMan.createDeviceControl(dev.devid);
+    }
+    //   const devid = info[0].devid
+    //   // const { pack } = toDevice().set({ state: 'on', initial: 'on' }).value
+    //   const { pack } = toDevice().get(['state', 'initial']).value
+    //   console.log(pack)
+    //   const res = await control.send(pack, 0)
+    //   console.log(res)
+});
+devMan.on('device:message', (devid, msg) => {
+    // console.log(devid, msg)
+    pusher.report({ devid, msg });
+});
+// * debug logger
+app.use(function (req, res, next) {
+    console.info(`[${req.path}] ${req.method}`);
+    next();
+});
+app.get('/api/device/list', (req, res) => {
+    const devInfo = devMan.getDeviceList();
+    const devState = devMan.getDeviceState();
+    const list = devInfo.map((dev) => {
+        const { online, ...state } = devState[dev.devid];
+        return {
+            ...dev,
+            state,
+            online,
+        };
+    });
+    res.json({ list });
+});
+app.post('/api/device/control', (req, res) => {
+    const inst = req.body;
+    devMan.updateState(inst);
+    // console.log(inst)
+    // {value:{devid:'nw.247886fe80b004e7',pack:{method:'set',data:{...}}}}
+    devMan.deviceSend(inst);
+    // if (inst.value.method === 'set')
+    // devMan.emit('client:update', inst)
+    res.json({ msg: 'ok' });
+});
+app.get('/api/device/state', (req, res) => {
+    const state = devMan.getDeviceState();
+    console.log(state);
+    res.json(state);
+});
+// ********
+camMan.on('action', (pattern) => {
+    console.log('detect pattern', pattern);
+    const devInfo = devMan.getDeviceList();
+    const devState = devMan.getDeviceState();
+    const dev = devInfo[2];
+    devState[dev.devid].state = (devState[dev.devid].state === 'on' ? 'off' : 'on');
+    const inst = toDevice(dev.devid).set(devState[dev.devid]);
+    devMan.updateState(inst);
+    devMan.deviceSend(inst);
+});
 // * start app
 app.start();
+// const task = new Task('./lib/hand-detect.js', { slot: 'hand-detect' }, { directory: module.directory })
+// const sigslot = new SigSlot('hand-detect')
+// sigslot.on('data', (msg) => {
+//   console.log(msg)
+// })
 // * event loop
 iosched.forever();

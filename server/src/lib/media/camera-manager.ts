@@ -36,26 +36,105 @@ export interface CameraInfo {
   password?: string
 }
 
-class SeqDetect extends EventEmitter {
-  lockList: [number, number][]
-  lockFrameNum: number = 10
-  pos?: [number, number]
+class SeqDetect {
+  // lockList: [number, number][]
+  lockFrameThreshold: number = 10
+
+  // pattern1 : lock + close
+  lockCloseFrameThreshold: number = 20
+  // pattern2 : lock + close + open
+
   isLock: boolean
-  lastPos?: [number, number]
+
+  lastState: [boolean, boolean]
+  // isOpen
+  // isStay
+
+  stateFrameNum: number
+
+  lastPos: [number, number]
+  stayThreshold: number = 50
+  // |x - x1| + |y - y1| <= stayThreshold
+
   constructor() {
-    super()
     this.isLock = false
+    this.lastState = [false, false]
+    this.stateFrameNum = 0
+    this.lastPos = [-1, -1]
   }
 
-  push(frame) {
-
+  clear() {
+    this.isLock = false
+    this.lastState = [false, false]
+    this.stateFrameNum = 0
+    this.lastPos = [-1, -1]
   }
 
-  state(frame) {
-
+  isOpen(fingers) {
+    return fingers.curlNum <= 2
   }
 
-  detect() { }
+  isStay(fingers) {
+    const dist = (this.lastPos[0] - fingers.base.x) + (this.lastPos[1] - fingers.base.y)
+    return this.lastPos[0] == -1 || dist <= this.stayThreshold
+  }
+
+  isClose(fingers) {
+    return !this.isOpen(fingers)
+  }
+
+  isMove(fingers) {
+    return !this.isStay(fingers)
+  }
+
+  push(fingers) {
+    const pattern = this.detect(fingers)
+    this.lastPos[0] = fingers.base.x
+    this.lastPos[1] = fingers.base.y
+    return pattern
+  }
+
+  getState(fingers) {
+    return [this.isOpen(fingers), this.isStay(fingers)]
+  }
+
+  detect(fingers) {
+    let pattern = -1
+    const lastStateFrameNum = this.stateFrameNum
+    // Open + Stay >= 10 frames
+    if (this.isOpen(fingers) && this.isStay(fingers) && this.stateFrameNum >= this.lockFrameThreshold) {
+      if (!this.isLock)
+        console.log('lock')
+
+      this.isLock = true
+      this.stateFrameNum = 0
+    }
+    if (this.isOpen(fingers) && this.isMove(fingers)) {
+      this.isLock = false
+      this.stateFrameNum = 0
+      // console.log('free');
+    }
+
+    // Pattern 1 : Lock + Close >= 20 frames
+
+    if (this.isLock && this.isClose(fingers) && this.stateFrameNum == this.lockCloseFrameThreshold)
+      pattern = 1
+
+    // Pattern 2 : Lock + Close + Open, Close <= 20 frames
+    if (this.isLock && this.isOpen(fingers) && this.lastState[0] == false && lastStateFrameNum < this.lockCloseFrameThreshold)
+      pattern = 2
+
+    const state = this.getState(fingers)
+    if (state[0] === this.lastState[0] && state[1] === this.lastState[1]) {
+      this.stateFrameNum++
+    }
+    else {
+      this.stateFrameNum = 0
+      this.lastState = [state[0], state[1]]
+    }
+
+    return pattern
+  }
 }
 
 export class CameraManager extends EventEmitter {
@@ -63,11 +142,14 @@ export class CameraManager extends EventEmitter {
   cameraMap: Map<string, CameraInfo | Cam> // key: urn
   profileMap: Map<string, any> // key: urn, value: profile
   streamMap: Map<string, any> // key: url
+  detector: SeqDetect
+
   constructor() {
     super()
     this.cameraMap = new Map()
     this.streamMap = new Map()
     this.profileMap = new Map()
+    this.detector = new SeqDetect()
   }
 
   createOnvifDiscovery(ifnames: string[]) {
@@ -191,7 +273,7 @@ export class CameraManager extends EventEmitter {
 
     // const model = await handTrack.load()
     server.on('start', () => {
-      netcam.open(rtspUri, { proto: 'tcp' }, 10000)
+      netcam.open(rtspUri, { proto: 'tcp', name: 'camera' }, 10000)
 
       // netcam.destVideoFormat({ width: 640, height: 360, fps: 15, pixelFormat: MediaDecoder.PIX_FMT_RGB24, noDrop: false, disable: false })
       // netcam.destAudioFormat({ disable: true })
@@ -222,13 +304,31 @@ export class CameraManager extends EventEmitter {
           return { base, curlNum: fingers.map(finger => finger.curl).filter(x => x).length }
         })
 
+        if (fingers.length == 0) {
+          this.detector.clear()
+        }
+        else {
+          // console.log(fingers[0].base)
+          // console.log(this.detector.lastState, this.detector.getState(fingers[0]), this.detector.lastState === this.detector.getState(fingers[0]), this.detector.stateFrameNum)
+          const pattern = this.detector.push(fingers[0])
+          if (pattern != -1) {
+            console.log('detect pattern = ', pattern)
+            this.emit('action', pattern)
+          }
+        }
+
+        // handnn.identify()
+        // console.log('vide')
+        // const da = Buffer.from(JSON.stringify({ hands }))
+
         // handnn.identify()
         // console.log('vide')
         // const da = Buffer.from(JSON.stringify({ hands }))
 
         // server.sendData(da)
         // server.
-        socket.send('camera:data', { hands, fingers })
+        // const fingers = {}
+        socket.send('camera:data', { hands, fingers, isLock: this.detector.isLock })
       })
 
       netcam.on('remux', (frame) => {

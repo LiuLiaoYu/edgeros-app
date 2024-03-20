@@ -9,16 +9,17 @@ import { WsServer } from 'websocket'
 import permission from 'async/permission'
 import socket from 'socket'
 
-import * as tf from '@tensorflow/tfjs'
+import SigSlot from 'sigslot'
 import { checkPermission, getIfnames } from './lib/utils'
 
 import { CameraManager } from './lib/media/camera-manager'
 import { StatePusher } from './lib/socket'
 import { kvdb } from './lib/db'
 
-import { deviceRoute, mediaRoute } from './routes'
+// import { deviceRoute, mediaRoute } from './routes'
 
 import { DeviceManager } from './lib/device/device-manager'
+import type { InstructionWrapper } from './lib/device/device-enhance'
 import { toDevice } from './lib/device/device-enhance'
 
 console.inspectEnable = true
@@ -30,10 +31,6 @@ app.use(WebApp.static('./public'))
 app.use(bodyParser.json())
 app.use(bodyParser.urlencoded())
 
-// * routes
-// app.use('/api/device', deviceRoute)
-// app.use('/api/media', mediaRoute)
-
 const pusher = new StatePusher(app, {
   path: '/socket/device-push',
   allowUpgrades: true,
@@ -42,6 +39,7 @@ pusher.listenAll('connection', () => {
   pusher.send('hello-test', { msg: 'connected' })
 })
 
+// *****************************************************
 const camMan = new CameraManager()
 
 // create onvif discovery server
@@ -68,45 +66,6 @@ camMan.on('login', async (urn) => {
   console.log(res)
 })
 
-app.get('/camera/list', (req, res) => {
-  res.json({ cameras: camMan.getCamList() })
-})
-
-const devMan = new DeviceManager()
-
-devMan.init()
-
-// devMan.on('init', async () => {
-//   const info = devMan.getDeviceList()
-//   const devid = info[0].devid
-//   const control = await devMan.getDeviceControl(devid)
-//   // const { pack } = toDevice().set({ state: 'on', initial: 'on' }).value
-//   const { pack } = toDevice().get(['state', 'initial']).value
-//   console.log(pack)
-//   const res = await control.send(pack, 0)
-//   console.log(res)
-// })
-
-devMan.on('device:message', (devid, msg) => {
-  console.log(devid, msg)
-  pusher.report({ devid, msg })
-})
-
-// * debug logger
-app.use(function (req, res, next) {
-  console.info(`[${req.path}] ${req.method}`)
-  next()
-})
-
-app.get('/api/device/list', (req, res) => {
-  res.json({ list: devMan.getDeviceList() })
-})
-
-app.post('/api/device/control', (req, res) => {
-  console.log(req.body)
-  res.json({ msg: 'ok' })
-})
-
 app.get('/api/camera/list', (req, res) => {
   res.json({ list: camMan.getCamList() })
 })
@@ -118,13 +77,95 @@ app.post('/api/camera/login', (req, res) => {
   res.json({ msg: 'yes' })
 })
 
-// console.log(tf.getBackend())
+// *****************************************************
+const devMan = new DeviceManager()
 
-// const a = tf.tensor([[1, 2], [3, 4]])
-// console.log(a)
+devMan.init()
+
+devMan.on('init', async () => {
+  const info = devMan.getDeviceList()
+  for (const dev of info) {
+    const control = devMan.createDeviceControl(dev.devid)
+  }
+//   const devid = info[0].devid
+//   // const { pack } = toDevice().set({ state: 'on', initial: 'on' }).value
+//   const { pack } = toDevice().get(['state', 'initial']).value
+//   console.log(pack)
+//   const res = await control.send(pack, 0)
+//   console.log(res)
+})
+
+devMan.on('device:message', (devid, msg) => {
+  // console.log(devid, msg)
+  pusher.report({ devid, msg })
+})
+
+// * debug logger
+app.use(function (req, res, next) {
+  console.info(`[${req.path}] ${req.method}`)
+  next()
+})
+
+app.get('/api/device/list', (req, res) => {
+  const devInfo = devMan.getDeviceList()
+  const devState = devMan.getDeviceState()
+
+  const list = devInfo.map((dev) => {
+    const { online, ...state } = devState[dev.devid]
+    return {
+      ...dev,
+      state,
+      online,
+    }
+  })
+
+  res.json({ list })
+})
+
+app.post('/api/device/control', (req, res) => {
+  const inst = req.body
+  devMan.updateState(inst as InstructionWrapper)
+  // console.log(inst)
+  // {value:{devid:'nw.247886fe80b004e7',pack:{method:'set',data:{...}}}}
+  devMan.deviceSend(inst as InstructionWrapper)
+
+  // if (inst.value.method === 'set')
+  // devMan.emit('client:update', inst)
+
+  res.json({ msg: 'ok' })
+})
+
+app.get('/api/device/state', (req, res) => {
+  const state = devMan.getDeviceState()
+  console.log(state)
+  res.json(state)
+})
+
+// ********
+camMan.on('action', (pattern) => {
+  console.log('detect pattern', pattern)
+  const devInfo = devMan.getDeviceList()
+  const devState = devMan.getDeviceState()
+
+  const dev = devInfo[2]
+
+  devState[dev.devid].state = (devState[dev.devid].state === 'on' ? 'off' : 'on')
+  const inst = toDevice(dev.devid).set(devState[dev.devid])
+
+  devMan.updateState(inst as InstructionWrapper)
+  devMan.deviceSend(inst as InstructionWrapper)
+})
 
 // * start app
 app.start()
+
+// const task = new Task('./lib/hand-detect.js', { slot: 'hand-detect' }, { directory: module.directory })
+
+// const sigslot = new SigSlot('hand-detect')
+
+// sigslot.on('data', (msg) => {
+//   console.log(msg)
+// })
 
 // * event loop
 iosched.forever()

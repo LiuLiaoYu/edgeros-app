@@ -1,19 +1,39 @@
 import EventEmitter from 'events'
 import Device from 'async/device'
-import { filterDeviceInfo } from './device-enhance'
+import permission from 'async/permission'
+import { filterDeviceInfo, toDevice } from './device-enhance'
 import type { InstructionWrapper } from './device-enhance'
 
 // import type { DeviceInfo } from 'async/device' // * not export
 
+const deviceGetState = {
+  'plug': ['state', 'initial'],
+  'light.belt': ['state', 'bright', 'color'],
+}
+
+const deviceDefaultState = {
+  'plug': {
+    state: 'off',
+    initial: 'on',
+  },
+  'light.belt': {
+    state: 'off',
+    bright: 128,
+    color: [0, 232, 33],
+    start: 0,
+    end: 150,
+  },
+}
+
 export class DeviceManager extends EventEmitter {
   private deviceInfo: Map<string, any>
   private deviceControl: Map<string, Device>
-
+  private deviceState: Map<string, any>
   constructor() {
     super()
     this.deviceInfo = new Map()
     this.deviceControl = new Map()
-    // this.deviceMap = new Map()
+    this.deviceState = new Map()
   }
 
   async init() {
@@ -23,22 +43,23 @@ export class DeviceManager extends EventEmitter {
     }))
     deviceInfoList.forEach(([devid, info]) => {
       this.deviceInfo.set(devid, info)
+
+      const type = info.report.type
+      this.deviceState.set(devid, { online: true, ...deviceDefaultState[type] })
     })
 
-    // Device.on('found', (devid, info) => {
-    // console.info()
-    // console.log('A new device was found:', devid, 'report:', info.report)
-    // })
     Device.on('join', (devid, info) => {
       console.info('[DeviceManager] new device join: ', JSON.stringify({ devid, info }))
       this.deviceInfo.set(devid, info)
+      const type = info.report.type
+      this.deviceState.set(devid, { online: true, ...deviceDefaultState[type] })
       this.emit('device:join', devid)
-      // console.log('Device join in:', devid, 'report:', info.report)
     })
     Device.on('lost', (devid) => {
       // `Device` instance will be automatically released
       console.info('[DeviceManager] device lost: ', devid)
-      this.deviceInfo.delete(devid)
+      // this.deviceInfo.delete(devid)
+      this.deviceState.get(devid).online = false
       this.deviceControl.delete(devid)
       this.emit('device:lost', devid)
     })
@@ -51,19 +72,35 @@ export class DeviceManager extends EventEmitter {
     return [...this.deviceInfo.entries()].map(([devid, info]) => filterDeviceInfo(devid, info))
   }
 
+  getDeviceState() {
+    return Object.fromEntries(this.deviceState)
+  }
+
   async createDeviceControl(devid: string) {
     const device = new Device()
     try {
       const res = await device.request(devid)
+      this.deviceControl.set(devid, device)
+
       device.on('message', (msg) => {
         this.emit('device:message', devid, msg)
+        if (msg.method === 'get')
+          this.deviceState.set(devid, { ...this.deviceState.get(devid), ...msg.data })
       })
-      this.deviceControl.set(devid, device)
+      // init device state
+      const type = this.deviceInfo.get(devid).report.type
+      const inst = toDevice(devid).get(deviceGetState[type])
+      await this.deviceSend(inst)
     }
     catch (err) {
       console.info('[DeviceManager] failed to request control', devid)
-      // if()
     }
+  }
+
+  updateState(inst: InstructionWrapper) {
+    const { devid, pack } = inst.value
+    this.deviceState.set(devid, { ...this.deviceState.get(devid), ...pack.data })
+    console.log(this.deviceState.get(devid))
   }
 
   async getDeviceControl(devid: string) {
@@ -78,7 +115,10 @@ export class DeviceManager extends EventEmitter {
     return await control.send(pack)
   }
 
-  async getDeviceState() {}
+  // async getDeviceState(devid: string) {
+  // const perm = await permission.device(devid)
+  // const type = this.deviceInfo.get(devid).report.type
+  // }
 
   // async control(devicePack: InstructionWrapper) {
   //   const { devid, pack } = devicePack.value

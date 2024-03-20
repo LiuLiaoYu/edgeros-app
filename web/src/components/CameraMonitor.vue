@@ -6,7 +6,7 @@ const err = ref('')
 const url = `wss://${document.domain}:${window.location.port}/stream?${authTokenQuery.value}`
 // const dataSocketUrl = `wss://${document.domain}:${window.location.port}/data?${authTokenQuery.value}`
 
-const monitor = new CanvasFlvMedia('source', 'canvas')
+const monitor = new CanvasFlvMedia('source', 'canvas', 300)
 
 /*
 const dataSocket = new WebSocket(dataSocketUrl)
@@ -22,29 +22,33 @@ dataSocket.addEventListener('message', (event) => {
   console.log('Message from server ', event.data)
 })
 */
+const container = ref()
+const { width, height } = useElementSize(container)
 
 onMounted(() => {
   monitor.init()
+  monitor.play()
 })
 </script>
 
 <template>
   <div>
     <div>
-      <video id="source" h-0 />
-      <div bg-gray-200>
-        <canvas id="canvas" width="640" height="360" />
+      <div ref="container" bg-gray-200>
+        <canvas id="canvas" />
+        <video id="source" h-0 />
       </div>
+      {{ width }} {{ height }}
     </div>
     <div>{{ err }}</div>
     <van-button type="primary" @click="monitor.connect(url)">
       连接
     </van-button>
-    <van-button type="primary" @click="monitor.play()">
-      play
-    </van-button>
+    <!-- <van-button type="primary" @click="monitor.play()"> -->
+    <!-- 播放 -->
+    <!-- </van-button> -->
 
-    <div>error: {{ err }}</div>
+    <!-- <div>error: {{ err }}</div> -->
   </div>
 </template>
 

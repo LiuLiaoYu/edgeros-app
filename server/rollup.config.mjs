@@ -5,11 +5,15 @@ import typescript from '@rollup/plugin-typescript'
 import { defineConfig } from 'rollup'
 
 export default defineConfig({
-  input: 'src/main.ts',
+  input: {
+    'main': 'src/main.ts',
+    'lib/hand-detect': 'src/lib/media/hand-detect.ts',
+  },
   output: {
     name: 'main',
-    file: '../app/main.js',
     format: 'cjs',
+    entryFileNames: '[name].js',
+    dir: '../app/',
   },
   plugins: [
     typescript(),
@@ -31,6 +35,7 @@ export default defineConfig({
     'websocket',
     'handnn',
     'lightkv',
+    'async/device',
   ],
 
 })

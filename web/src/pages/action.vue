@@ -4,14 +4,6 @@ const iconMap = {
   'light.belt': 'i-material-symbols:lightbulb-outline-rounded',
 }
 
-// const data = reactive({
-//   list: [
-//     { devid: 'nw.247886fe80b004e7', label: '智能插座', type: 'plug', brand: '核芯科技HXKJ', model: 'CZ02A-J', state: { state: 'on' }, online: true },
-//     { devid: 'nw.d46fc3fe8096f376', label: '智能氛围灯2', type: 'light.belt', brand: '核芯科技HXKJ', model: 'RGB-01', state: { state: 'on', bright: 123, color: [123, 123, 123] }, online: false },
-//     { devid: 'nw.8c9999fe8051e5c2', label: '智能氛围灯1', type: 'light.belt', brand: '核芯科技HXKJ', model: 'RGB-01', state: { state: 'on', bright: 123, color: [123, 123, 123] }, online: true },
-//   ],
-// })
-
 const activeNames = ref([])
 const { isFetching, data: dat, execute } = useAuthFetch('/api/device/list').json()
 

@@ -11,7 +11,7 @@ var jsreOnvif = require('@edgeros/jsre-onvif');
 var MediaDecoder = require('mediadecoder');
 var WebMedia = require('webmedia');
 var websocket = require('websocket');
-var handnn = require('handnn');
+var SigSlot = require('sigslot');
 var SocketServer = require('socket.io');
 var LightKV = require('lightkv');
 var Device = require('async/device');
@@ -29,86 +29,12 @@ async function getIfnames() {
 // import { checkPerm, getIfnames } from '../utils'
 // import * as handTrack from '../handtrack.min'
 console.inspectEnable = true;
-class SeqDetect {
-    // |x - x1| + |y - y1| <= stayThreshold
-    constructor() {
-        // lockList: [number, number][]
-        this.lockFrameThreshold = 10;
-        // pattern1 : lock + close
-        this.lockCloseFrameThreshold = 20;
-        this.stayThreshold = 50;
-        this.isLock = false;
-        this.lastState = [false, false];
-        this.stateFrameNum = 0;
-        this.lastPos = [-1, -1];
-    }
-    clear() {
-        this.isLock = false;
-        this.lastState = [false, false];
-        this.stateFrameNum = 0;
-        this.lastPos = [-1, -1];
-    }
-    isOpen(fingers) {
-        return fingers.curlNum <= 2;
-    }
-    isStay(fingers) {
-        const dist = (this.lastPos[0] - fingers.base.x) + (this.lastPos[1] - fingers.base.y);
-        return this.lastPos[0] == -1 || dist <= this.stayThreshold;
-    }
-    isClose(fingers) {
-        return !this.isOpen(fingers);
-    }
-    isMove(fingers) {
-        return !this.isStay(fingers);
-    }
-    push(fingers) {
-        const pattern = this.detect(fingers);
-        this.lastPos[0] = fingers.base.x;
-        this.lastPos[1] = fingers.base.y;
-        return pattern;
-    }
-    getState(fingers) {
-        return [this.isOpen(fingers), this.isStay(fingers)];
-    }
-    detect(fingers) {
-        let pattern = -1;
-        const lastStateFrameNum = this.stateFrameNum;
-        // Open + Stay >= 10 frames
-        if (this.isOpen(fingers) && this.isStay(fingers) && this.stateFrameNum >= this.lockFrameThreshold) {
-            if (!this.isLock)
-                console.log('lock');
-            this.isLock = true;
-            this.stateFrameNum = 0;
-        }
-        if (this.isOpen(fingers) && this.isMove(fingers)) {
-            this.isLock = false;
-            this.stateFrameNum = 0;
-            // console.log('free');
-        }
-        // Pattern 1 : Lock + Close >= 20 frames
-        if (this.isLock && this.isClose(fingers) && this.stateFrameNum == this.lockCloseFrameThreshold)
-            pattern = 1;
-        // Pattern 2 : Lock + Close + Open, Close <= 20 frames
-        if (this.isLock && this.isOpen(fingers) && this.lastState[0] == false && lastStateFrameNum < this.lockCloseFrameThreshold)
-            pattern = 2;
-        const state = this.getState(fingers);
-        if (state[0] === this.lastState[0] && state[1] === this.lastState[1]) {
-            this.stateFrameNum++;
-        }
-        else {
-            this.stateFrameNum = 0;
-            this.lastState = [state[0], state[1]];
-        }
-        return pattern;
-    }
-}
 class CameraManager extends EventEmitter {
     constructor() {
         super();
         this.cameraMap = new Map();
         this.streamMap = new Map();
         this.profileMap = new Map();
-        this.detector = new SeqDetect();
     }
     createOnvifDiscovery(ifnames) {
         const nets = ifnames.map(item => ({ ifname: item, localPort: 0 }));
@@ -194,88 +120,39 @@ class CameraManager extends EventEmitter {
         const { protocol, host, pathname } = new URL(uri);
         const { username, password } = this.cameraMap.get(urn);
         const rtspUri = `${protocol}://${username}:${password}@${host}${pathname}`;
-        console.log(rtspUri);
-        // dataSocket.start()
-        // dataSocket.on('start', () => {
-        //   console.log('ws started')
-        // })
-        // dataSocket.on('connection', () => {
-        //   console.log('--> connected')
-        // })
-        // const dataSocket = WsServer.createServer(`/data`, app)
+        console.info(`[CameraManager]: create stream server ${rtspUri}`);
         const streamSocket = websocket.WsServer.createServer('/stream', app);
         const opts = {
-            mode: 1,
+            mode: 1, // `compound` mode failed in this project
             mediaSource: { source: 'flv' },
             streamChannel: { protocol: 'ws', server: streamSocket },
             // dataChannel: { protocol: 'ws', server: dataSocket },
         };
-        // const handnn = require('handnn')
         const server = WebMedia.createServer(opts, app);
         const netcam = new MediaDecoder();
-        // const model = await handTrack.load()
         server.on('start', () => {
+            // open rtsp stream
             netcam.open(rtspUri, { proto: 'tcp', name: 'camera' }, 10000);
-            // netcam.destVideoFormat({ width: 640, height: 360, fps: 15, pixelFormat: MediaDecoder.PIX_FMT_RGB24, noDrop: false, disable: false })
-            // netcam.destAudioFormat({ disable: true })
-            netcam.destVideoFormat({
-                width: 640,
-                height: 360,
-                fps: 15,
-                pixelFormat: MediaDecoder.PIX_FMT_BGR24,
-                disable: false,
-            });
-            netcam.destAudioFormat({
-                disable: true,
-            });
-            netcam.remuxFormat({
-                enable: true,
-                enableAudio: false,
-                format: 'flv',
-            });
-            netcam.on('video', (video) => {
-                const buf = new Buffer(video.arrayBuffer);
-                const hands = handnn.detect(buf, { width: 640, height: 360, pixelFormat: handnn.PIX_FMT_BGR24 });
-                // const faces = facenn.detect(buf, { width: 640, height: 360, pixelFormat: facenn.PIX_FMT_BGR2RGB24 })
-                const fingers = hands.map((hand) => {
-                    const f = handnn.identify(buf, { width: 640, height: 360, pixelFormat: handnn.PIX_FMT_BGR24 }, hand);
-                    const { base, fingers } = f;
-                    return { base, curlNum: fingers.map(finger => finger.curl).filter(x => x).length };
-                });
-                if (fingers.length == 0) {
-                    this.detector.clear();
-                }
-                else {
-                    // console.log(fingers[0].base)
-                    // console.log(this.detector.lastState, this.detector.getState(fingers[0]), this.detector.lastState === this.detector.getState(fingers[0]), this.detector.stateFrameNum)
-                    const pattern = this.detector.push(fingers[0]);
-                    if (pattern != -1) {
-                        console.log('detect pattern = ', pattern);
-                        this.emit('action', pattern);
-                    }
-                }
-                // handnn.identify()
-                // console.log('vide')
-                // const da = Buffer.from(JSON.stringify({ hands }))
-                // handnn.identify()
-                // console.log('vide')
-                // const da = Buffer.from(JSON.stringify({ hands }))
-                // server.sendData(da)
-                // server.
-                // const fingers = {}
-                socket.send('camera:data', { hands, fingers, isLock: this.detector.isLock });
-            });
-            netcam.on('remux', (frame) => {
-                const buf = Buffer.from(frame.arrayBuffer);
-                // console.log(buf.length)
-                server.pushStream(buf);
-            });
-            netcam.on('header', (frame) => {
-                const buf = Buffer.from(frame.arrayBuffer);
-                server.pushStream(buf);
-            });
-            console.log(netcam.info());
+            // set dest format
+            netcam.destVideoFormat({ width: 640, height: 360, fps: 15, pixelFormat: MediaDecoder.PIX_FMT_BGR24, disable: false });
+            netcam.destAudioFormat({ disable: true });
+            // set flv stream
+            netcam.remuxFormat({ enable: true, enableAudio: false, format: 'flv' });
+            // flv stream
+            netcam.on('remux', (frame) => { server.pushStream(Buffer.from(frame.arrayBuffer)); });
+            netcam.on('header', (frame) => { server.pushStream(Buffer.from(frame.arrayBuffer)); });
             netcam.start();
+            this.task = new Task('./lib/hand-detect.js', {
+                netcamName: 'camera',
+                sigSlotName: 'hand-detect',
+            }, { directory: module.directory });
+            this.sigslot = new SigSlot('hand-detect');
+            this.sigslot.on('camera:detect', (msg) => {
+                socket.send('camera:data', msg);
+                const { pattern } = msg;
+                if (pattern == 1 || pattern == 2)
+                    this.emit('action', msg);
+            });
         });
         server.start();
         return {
@@ -283,54 +160,6 @@ class CameraManager extends EventEmitter {
             path: '/stream',
             // stream: "wss://"
         };
-        // server.start()
-        // console.log(streamSocket)
-        // const dataServer = WsServer.createServer(`/${videoUrl}.media`, app)
-        // const streamServer = WsServer.createServer(`/stream`, app)
-        // const mediaOpts = {
-        //   mode: 1,
-        //   path: '/stream',
-        //   mediaSource: { source: 'flv' },
-        //   streamChannel: { protocol: 'ws', server: streamServer },
-        //   // dataChannel: { protocol: 'ws', server: dataServer },
-        // }
-        // console.info(`[camera:${cam.hostname}][uri:${uri}]`)
-        // const urlObj = new URL(uri)
-        // const { username, password } = cam
-        // const rtspUrl = `${urlObj.protocol}://${username}:${password}@${urlObj.host}${urlObj.pathname}`
-        // console.log(rtspUrl)
-        // try {
-        //   const mediaServer = WebMedia.createServer(mediaOpts, app)
-        //   mediaServer.on('start', (server) => {
-        //     const netcam = new MediaDecoder().open(rtspUrl, { proto: 'tcp' }, 10000)
-        //     const videoFormat = netcam.srcVideoFormat()
-        //     const audioFormat = netcam.srcAudioFormat()
-        //     console.log('[video format]:', JSON.stringify(videoFormat))
-        //     console.log('[audio format]:', JSON.stringify(audioFormat))
-        //     // netcam.destVideoFormat({ width: videoFormat.width / 2, height: videoFormat.height / 2, fps: 4, pixelFormat: MediaDecoder.PIX_FMT_RGB24, disable: false })
-        //     // netcam.destAudioFormat({ disable: true })
-        //     // netcam.remuxFormat({ enable: true, enableAudio: false, format: 'flv' })
-        //     netcam.destVideoFormat({ width: 640, height: 360, fps: 15, pixelFormat: MediaDecoder.PIX_FMT_RGB24, noDrop: false, disable: false })
-        //     netcam.destAudioFormat({ disable: true })
-        //     netcam.remuxFormat({ enable: true, enableAudio: false, format: 'flv' })
-        //     // netcam.destVideoFormat({ width: info.width, height: info.height, fps: 1, disable: false });
-        //     // netcam.on('video', (frame) => {
-        //     // console.log(frame);
-        //     // console.log(Buffer.from(frame.arrayBuffer))
-        //     // })
-        //     netcam.on('remux', (frame) => {
-        //       const buf = Buffer.from(frame.arrayBuffer)
-        //       // console.log(Buffer.from(frame.arrayBuffer).length)
-        //       server.pushStream(buf)
-        //     })
-        //     netcam.on('header', (frame) => {
-        //       const buf = Buffer.from(frame.arrayBuffer)
-        //       // console.log(frame);
-        //       server.pushStream(buf)
-        //     })
-        //     netcam.start()
-        //     this.streamMap.set(uri, mediaServer)
-        //   })
         //   mediaServer.on('stop', () => {
         //     console.warn('[webmedia on stop]')
         //     // netcam && netcam.stop()
@@ -697,8 +526,8 @@ app.get('/api/device/state', (req, res) => {
     console.log(state);
     res.json(state);
 });
-// ********
-camMan.on('action', (pattern) => {
+// ******** 动作部分并没有完整做好，以下对第3个设置进行控制
+camMan.on('action', ({ pattern }) => {
     console.log('detect pattern', pattern);
     const devInfo = devMan.getDeviceList();
     const devState = devMan.getDeviceState();
@@ -710,10 +539,5 @@ camMan.on('action', (pattern) => {
 });
 // * start app
 app.start();
-// const task = new Task('./lib/hand-detect.js', { slot: 'hand-detect' }, { directory: module.directory })
-// const sigslot = new SigSlot('hand-detect')
-// sigslot.on('data', (msg) => {
-//   console.log(msg)
-// })
 // * event loop
 iosched.forever();

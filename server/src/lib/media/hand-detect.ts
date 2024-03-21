@@ -1,28 +1,24 @@
 import handnn from 'handnn'
 import facenn from 'facenn'
+import iosched from 'iosched'
 import MediaDecoder from 'mediadecoder'
 import SigSlot from 'sigslot'
 
 const args = ARGUMENT as {
-  name: string // the `master` decoder name, see the `opts` parameter of MediaDecoder.open()
+  netcamName: string // the `master` decoder name, see the `opts` parameter of MediaDecoder.open()
   sigSlotName: string
 }
 
-console.log(args.sigSlotName)
+console.log(args)
 
 class SeqDetect {
-  // lockList: [number, number][]
   lockFrameThreshold: number = 10
+  lockCloseFrameThreshold: number = 20
+  isLock: boolean
+  lastState: [boolean, boolean] // [isOpen, isStay]
 
   // pattern1 : lock + close
-  lockCloseFrameThreshold: number = 20
   // pattern2 : lock + close + open
-
-  isLock: boolean
-
-  lastState: [boolean, boolean]
-  // isOpen
-  // isStay
 
   stateFrameNum: number
 
@@ -45,7 +41,7 @@ class SeqDetect {
   }
 
   isOpen(fingers) {
-    return fingers.curlNum <= 2
+    return fingers.curlNum <= 1 // ?
   }
 
   isStay(fingers) {
@@ -115,62 +111,63 @@ class HandDetect {
   sigslot: SigSlot
   netcam: MediaDecoder
   netcamName: string
+  detector: SeqDetect
+  running: boolean
   constructor(sigSlotName: string, netcamName: string) {
     this.sigslot = new SigSlot(sigSlotName)
     this.netcamName = netcamName
+    this.detector = new SeqDetect()
+    this.running = true
   }
 
   start() {
     this.netcam = new MediaDecoder()
     this.netcam.open(this.netcamName) // `slave` mode
 
+    // sigslot-event `camera:detect`
+    // hands : prob, x0, x1, y0, y1
+    // pattern : gesture id
+    // isLock : hand in lock state
+    // on `video`
     this.netcam.on('video', (frame) => { //
+      // console.log('here')
       const buf = Buffer.from(frame.arrayBuffer)
-
-      const hands = handnn.detect(buf, { width: 640, height: 360, pixelFormat: handnn.PIX_FMT_BGR24 })
       // const faces = facenn.detect(buf, { width: 640, height: 360, pixelFormat: facenn.PIX_FMT_BGR2RGB24 })
-
-      const fingers = hands.map((hand) => {
-        const f = handnn.identify(buf, { width: 640, height: 360, pixelFormat: handnn.PIX_FMT_BGR24 }, hand)
-        const { base, fingers } = f
+      const hands = handnn.detect(buf, { width: 640, height: 360, pixelFormat: handnn.PIX_FMT_BGR24 })
+      const fingersList = hands.map((hand) => {
+        const res = handnn.identify(buf, { width: 640, height: 360, pixelFormat: handnn.PIX_FMT_BGR24 }, hand)
+        const { base, fingers } = res
         return { base, curlNum: fingers.map(finger => finger.curl).filter(x => x).length }
       })
 
-      if (fingers.length == 0) {
+      let pattern
+      if (fingersList.length == 0)
         this.detector.clear()
-      }
-      else {
-        // console.log(fingers[0].base)
-        // console.log(this.detector.lastState, this.detector.getState(fingers[0]), this.detector.lastState === this.detector.getState(fingers[0]), this.detector.stateFrameNum)
-        const pattern = this.detector.push(fingers[0])
-        if (pattern != -1) {
-          console.log('detect pattern = ', pattern)
-          this.emit('action', pattern)
-        }
-      }
+      else
+        pattern = this.detector.push(fingersList[0])
 
-      // handnn.identify()
-      // console.log('vide')
-      // const da = Buffer.from(JSON.stringify({ hands }))
-
-      // handnn.identify()
-      // console.log('vide')
-      // const da = Buffer.from(JSON.stringify({ hands }))
-
-      // server.sendData(da)
-      // server.
-      // const fingers = {}
-      // socket.send('camera:data', { hands, fingers, isLock: this.detector.isLock })
+      this.sigslot.emit('camera:detect', {
+        hands,
+        pattern,
+        isLock: this.detector.isLock,
+      })
     })
+
+    this.netcam.start()
+  }
+
+  stop() {
+    this.netcam.close()
+    this.sigslot.off()
+    this.running = false
   }
 }
 
-// sigslot.emit('data', { msg: 'heloo ' })
+const handdetect = new HandDetect(args.sigSlotName, args.netcamName)
 
-// class HandDetect {
-// constructor() {
-//
-// }
-// }
-//
-// const task = new Task('./task.js', undefined, { directory: module.directory })
+handdetect.start()
+
+while (handdetect.running)
+  iosched.poll()
+
+console.log('task over')

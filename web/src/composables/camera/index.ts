@@ -67,34 +67,23 @@ export class CanvasFlvMedia {
 
     socketClient.client.on('camera:data', ({ hands, fingers, isLock }) => {
       this.canvasContext!.drawImage(this.source!, 0, 0, this.width, this.height)
-
-      // hands = hands.map((hand, idx) => ({ ...hand, curlNum: fingers[idx].reduce((res, cur) => res += cur ? 1 : 0, 0) }))
-      // const isOpen = fingers.map((f)=>f.curl.all())
-
       for (const i in hands) {
-        this.canvasContext.strokeStyle = isLock ? 'red' : 'green'
-        this.canvasContext.lineWidth = 3
         let { x0, x1, y0, y1 } = hands[i]
         x0 = Math.round(x0 * this.rate)
         x1 = Math.round(x1 * this.rate)
         y0 = Math.round(y0 * this.rate)
         y1 = Math.round(y1 * this.rate)
-
         const h = y1 - y0
         const w = x1 - x0
-        this.canvasContext.strokeRect(x0, y0, w, h)
-        this.canvasContext.lineWidth = 1
-        this.canvasContext.strokeText(isLock ? `hand[${i}] locked` : `hand[${i}]`, x0, y0)
-        // console.log(hand)
-      }
-      // console.log(fingers)
 
-      // this.canvasContext.strokeStyle = 'red'
-      // for (const face of faces) {
-      //   const h = face.y1 - face.y0
-      //   const w = face.x1 - face.x0
-      //   this.canvasContext.strokeRect(face.x0, face.y0, w, h)
-      // }
+        this.canvasContext!.strokeStyle = isLock ? 'red' : 'green'
+
+        this.canvasContext!.lineWidth = 3
+        this.canvasContext!.strokeRect(x0, y0, w, h)
+
+        this.canvasContext!.lineWidth = 1
+        this.canvasContext!.strokeText(isLock ? `hand[${i}] locked` : `hand[${i}]`, x0, y0)
+      }
     })
   }
 

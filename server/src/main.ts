@@ -53,6 +53,7 @@ camMan.on('ready', (urn) => {
     camMan.loginCamera(urn, username, password)
   }
 })
+
 camMan.on('login-error', (urn) => {
   pusher.send('camera:login-error', urn)
 })
@@ -141,9 +142,10 @@ app.get('/api/device/state', (req, res) => {
   res.json(state)
 })
 
-// ********
-camMan.on('action', (pattern) => {
+// ******** 动作部分并没有完整做好，以下对第3个设置进行控制
+camMan.on('action', ({ pattern }) => {
   console.log('detect pattern', pattern)
+
   const devInfo = devMan.getDeviceList()
   const devState = devMan.getDeviceState()
 
@@ -158,14 +160,6 @@ camMan.on('action', (pattern) => {
 
 // * start app
 app.start()
-
-// const task = new Task('./lib/hand-detect.js', { slot: 'hand-detect' }, { directory: module.directory })
-
-// const sigslot = new SigSlot('hand-detect')
-
-// sigslot.on('data', (msg) => {
-//   console.log(msg)
-// })
 
 // * event loop
 iosched.forever()
